@@ -3,7 +3,10 @@ uvicorn
 sqlalchemy
 psycopg2-binary
 alembic
+asyncpg
 python-jose
-passlib
+bcrypt
+passlib[bcrypt]
+python-multipart
 pydantic
 pytest

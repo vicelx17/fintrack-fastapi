@@ -1,14 +1,22 @@
+# Imagen base
 FROM python:3.13-slim
 
+# Variables de entorno para no generar .pyc y buffers
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Crear directorio de la app
 WORKDIR /app
 
-# Instalamos dependencias de compilación (bcrypt, psycopg2, etc.)
-RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
-
+# Copiar requirements
 COPY requirements.txt .
 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Instalar dependencias
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-COPY ./app /app
+# Copiar código
+COPY . .
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Comando para arrancar la app con uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

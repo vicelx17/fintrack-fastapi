@@ -18,6 +18,20 @@ Construida para ser rápida, escalable y lista para producción.
 - 🔐 **JWT Auth** – Autenticación segura
 - 🐳 **Docker & Docker Compose** – Entorno reproducible
 ---
+## 🛠️ Features principales (roadmap)
+
+✅Configuración inicial con Docker
+
+✅Registro/Login de usuarios con JWT
+
+⌛CRUD de ingresos y gastos
+
+⌛Reportes financieros (resúmenes, balance mensual)
+
+⌛Integración con IA (predicciones de gasto futuro)
+
+⌛Deploy en la nube (Render/Heroku/VPS)
+
 ## 🤝 Contribución
 💡¡Toda idea es bienvenida!
 

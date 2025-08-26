@@ -1,7 +1,10 @@
+version: "3.9"
+
 services:
   db:
-    image: postgres:16-alpine
-    container_name: finanzas_db
+    image: postgres:16
+    container_name: fintrack_db
+    restart: always
     environment:
       POSTGRES_USER: vicente
       POSTGRES_PASSWORD: secret
@@ -9,18 +12,23 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
   api:
     build: .
     container_name: fintrack_api
-    env_file:
-      - .env
+    restart: always
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vicente:secret@db:5432/finanzas
+      SECRET_KEY: "change_me_prod"
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
     depends_on:
       - db
     volumes:
-      - ./:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - .:/app
+
 volumes:
-  db_data:
+  postgres_data:
