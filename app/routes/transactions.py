@@ -1,0 +1,45 @@
+
+from typing import List
+
+from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.schemas.transaction import TransactionResponse, TransactionCreate, TransactionUpdate
+from app.services.auth_service import get_current_user
+from app.services.transaction_service import get_transactions, create_transaction, update_transaction, \
+    delete_transaction
+
+router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+@router.get("/", response_model=List[TransactionResponse])
+async def list_user_transactions(db: AsyncSession = Depends(get_db()), current_user: dict = Depends(get_current_user)):
+    return await get_transactions(db, current_user["id"])
+
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+async def create_new_transaction(
+        transaction: TransactionCreate,
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    return await create_transaction(db, current_user["id"], transaction)
+
+@router.put("/{id}", response_model=TransactionResponse)
+async def update_user_transaction(
+        transaction_id: int,
+        transaction: TransactionUpdate,
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    tx = await update_transaction(db, current_user["id"], transaction_id, transaction)
+    if not tx:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    return tx
+
+@router.delete("/{id}")
+async def delete_user_transaction(
+        transaction_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
+):
+    return await delete_transaction(db, current_user["id"], transaction_id)

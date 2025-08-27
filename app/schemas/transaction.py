@@ -15,7 +15,7 @@ class TransactionCreate(TransactionBase):
 class TransactionUpdate(TransactionBase):
     pass
 
-class TransactionOut(TransactionBase):
+class TransactionResponse(TransactionBase):
     id: int
     user_id: int
     date: datetime
