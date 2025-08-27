@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core import Base
 
@@ -12,3 +12,4 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
+    transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
