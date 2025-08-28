@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from tokenize import String
 
-from sqlalchemy import Column, Integer, ForeignKey, Float, DateTime
+
+from sqlalchemy import Column, Integer, ForeignKey, Float, String, TIMESTAMP
 from sqlalchemy.orm import relationship
 
 from app.core import Base
@@ -14,8 +14,9 @@ class Transaction(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=False)
-    date = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
 
+    # relationships
     user = relationship("User", back_populates="transactions")
-    category = relationship("Category", back_populates="transactions", lazy="joined")
+    category = relationship("Category", back_populates="transactions")

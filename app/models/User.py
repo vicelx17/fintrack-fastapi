@@ -12,4 +12,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
+
+    # relationships
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
+    categories = relationship("Category", back_populates="user")
