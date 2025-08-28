@@ -6,7 +6,7 @@ from app.schemas.auth_schema import LoginBody, RegisterBody, TokenResponse
 from app.services.auth_service import login_user, get_current_user
 from app.services.user_service import register_user
 from app.core.database import get_db
-from app.models.User import User
+from app.models.user import User
 
 router = APIRouter()
 
