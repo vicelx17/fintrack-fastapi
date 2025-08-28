@@ -4,7 +4,7 @@ from sqlalchemy import update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.Transaction import Transaction
+from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
 
@@ -21,7 +21,7 @@ async def create_transaction(db: AsyncSession, user_id: int, transaction: Transa
     await db.refresh(new_transaction)
     return new_transaction
 
-async def get_transactions(db: AsyncSession, user_id: int) -> Transaction:
+async def get_transactions(db: AsyncSession, user_id: int):
     result = await db.execute(select(Transaction).where(Transaction.user_id == user_id))
     return result.scalars().all()
 

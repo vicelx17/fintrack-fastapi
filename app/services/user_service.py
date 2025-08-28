@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
-from app.models.User import User
+from app.models.user import User
 from app.core.security import hash_password
 
 async def register_user(db: AsyncSession, username: str, email: str, password: str) -> User:
