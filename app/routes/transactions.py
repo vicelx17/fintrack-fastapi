@@ -27,20 +27,20 @@ async def create_new_transaction(
 
 @router.put("/{id}", response_model=TransactionResponse)
 async def update_user_transaction(
-        transaction_id: int,
+        id: int,
         transaction: TransactionUpdate,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    tx = await update_transaction(db, current_user.id, transaction_id, transaction)
+    tx = await update_transaction(db, current_user.id, id, transaction)
     if not tx:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return tx
 
 @router.delete("/{id}")
 async def delete_user_transaction(
-        transaction_id: int,
+        id: int,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    return await delete_transaction(db, current_user.id, transaction_id)
+    return await delete_transaction(db, current_user.id, id)
