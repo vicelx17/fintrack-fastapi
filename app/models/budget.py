@@ -1,6 +1,8 @@
-from sqlite3 import Date
+from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, Float, ForeignKey
+
+from sqlalchemy import Column, Integer, Float, ForeignKey, TIMESTAMP, String
+
 from sqlalchemy.orm import relationship
 
 from app.core import Base
@@ -10,9 +12,10 @@ class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
+    start_date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
+    end_date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
 
     # FK
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

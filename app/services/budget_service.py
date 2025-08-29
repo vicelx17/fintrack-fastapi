@@ -9,8 +9,9 @@ from app.schemas.budget import BudgetCreate, BudgetUpdate
 async def create_budget(db:AsyncSession, user_id:int, budget: BudgetCreate):
     new_budget = Budget(
         user_id = user_id,
+        name = budget.name,
         amount = budget.amount,
-        category = budget.category_id,
+        category_id = budget.category_id,
         start_date = budget.start_date,
         end_date = budget.end_date,
     )
@@ -21,23 +22,24 @@ async def create_budget(db:AsyncSession, user_id:int, budget: BudgetCreate):
 
 async def get_budgets(db:AsyncSession, user_id:int):
     result = await db.execute(select(Budget).where(Budget.user_id == user_id))
+    return result.scalars().all()
 
 async def get_budget_by_id(db:AsyncSession, user_id:int, budget_id:int):
     result = await db.execute(
         select(Budget).where(Budget.id == budget_id, Budget.user_id == user_id)
     )
-    return result.scalars().one_or_none()
+    return result.scalar_one_or_none()
 
 async def update_budget(db:AsyncSession, user_id:int, budget_id:int, budget_update:BudgetUpdate):
     query = (
         update(Budget)
-        .where(Budget.id == Budget.id, Budget.user_id == user_id)
+        .where(Budget.id == budget_id, Budget.user_id == user_id)
         .values(budget_update.model_dump(exclude_unset=True))
         .returning(Budget)
     )
     result = await db.execute(query)
     await db.commit()
-    return result.scalars().one_or_none()
+    return result.scalar_one_or_none()
 
 async def delete_budget(db:AsyncSession, user_id:int, budget_id:int):
     query = (delete(Budget).where(Budget.id == budget_id, Budget.user_id == user_id))
