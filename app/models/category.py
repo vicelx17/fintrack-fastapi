@@ -11,10 +11,10 @@ class Category(Base):
     name = Column(String, nullable=False)
 
     # FK
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="categories")
-    transactions = relationship("Transaction", back_populates="category")
-    budgets = relationship("Budget", back_populates="category")
+    transactions = relationship("Transaction", back_populates="category", cascade="all, delete-orphan", passive_deletes=True)
+    budgets = relationship("Budget", back_populates="category", cascade="all, delete-orphan", passive_deletes=True)
 

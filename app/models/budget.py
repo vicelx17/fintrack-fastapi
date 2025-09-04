@@ -18,8 +18,8 @@ class Budget(Base):
     end_date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
 
     # FK
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
 
     #Relationships
     user = relationship("User", back_populates="budgets")

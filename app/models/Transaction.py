@@ -11,11 +11,13 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=False)
     date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+
+    #FK
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
 
     # relationships
     user = relationship("User", back_populates="transactions")
