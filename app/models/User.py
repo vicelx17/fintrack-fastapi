@@ -14,6 +14,6 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
 
     # Relationships
-    transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
-    categories = relationship("Category", back_populates="user")
-    budgets = relationship("Budget", back_populates="user")
+    transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    categories = relationship("Category", back_populates="user", passive_deletes=True)
+    budgets = relationship("Budget", back_populates="user", passive_deletes=True)
