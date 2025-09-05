@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 class LoginBody(BaseModel):
@@ -12,4 +14,4 @@ class RegisterBody(BaseModel):
     username: str
     email: str
     password: str
-    role: str
+    role: Optional[str] = None
