@@ -4,13 +4,13 @@ from typing import List
 
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user, require_admin
 from app.services.user_service import get_all_users, get_user_by_id, update_user, delete_user
 from app.core.database import get_db
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=List[UserResponse], dependencies=[Depends(require_admin)])
 async def list_users(db: AsyncSession = Depends(get_db)):
     return await get_all_users(db)
 
