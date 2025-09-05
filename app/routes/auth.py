@@ -16,7 +16,7 @@ async def read_users_me(user: User = Depends(get_current_user)):
 
 @router.post("/register", response_model=TokenResponse)
 async def register(body: RegisterBody, db: AsyncSession = Depends(get_db)):
-    user = await register_user(db, body.username, body.email, body.password)
+    user = await register_user(db, body.username, body.email, body.password, body.role)
     token = create_access_token(data={"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 

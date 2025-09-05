@@ -12,3 +12,4 @@ class RegisterBody(BaseModel):
     username: str
     email: str
     password: str
+    role: str
