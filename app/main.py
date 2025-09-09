@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from unicodedata import category
 
-from app.routes import auth, transactions, categories, budgets, users
+from app.routes import auth, transactions, categories, budgets, users, reports
 from app.core import Base
 from app.core.database import engine
 from app.models.user import User
@@ -27,6 +27,7 @@ app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(budgets.router)
 app.include_router(users.router)
+app.include_router(reports.router)
 
 @app.get("/")
 async def root():
