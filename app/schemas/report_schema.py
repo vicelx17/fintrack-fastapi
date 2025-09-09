@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 from typing import List
 
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ class ReportTransaction(BaseModel):
     id: int
     amount: float
     description: str
-    date: datetime
+    date: date
     category: str
 
     class Config:

@@ -1,21 +1,21 @@
-from datetime import datetime
+from datetime import date
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.transaction import Transaction
 from app.schemas.report_schema import ReportResponse, ReportTransaction, ReportCategory
 
 
 async def generate_report(
-        db:AsyncSession ,
+        db: AsyncSession,
         user_id: int,
-        start_date: Optional[datetime]=None,
-        end_date: Optional[datetime]=None) -> ReportResponse:
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None) -> ReportResponse:
 
-
-    query = select(Transaction).where(Transaction.user_id == user_id)
+    query = select(Transaction).options(selectinload(Transaction.category)).where(Transaction.user_id == user_id)
 
     if start_date:
         query = query.where(Transaction.date >= start_date)
@@ -41,27 +41,25 @@ async def generate_report(
     category_totals = {}
 
     for transaction in transactions_data:
-        if transaction.category_id:
-            category_name = transaction.category.name if transaction.category else "Sin categoría"
-            category_totals[category_name] = category_totals.get(category_name, 0) + transaction.amount
-        else:
-            total_expenses += abs(transaction.amount)
+        category_name = transaction.category.name if transaction.category else "Sin categoría"
+        category_totals[category_name] = category_totals.get(category_name, 0) + abs(transaction.amount)
 
-        top_categories = sorted(
-            [ReportCategory(category=name, total=total) for name, total in category_totals.items()],
-            key=lambda c: abs(c.total),
-            reverse=True
-        )[:3]
+    top_categories = sorted(
+        [ReportCategory(category=name, total=total) for name, total in category_totals.items()],
+        key=lambda c: c.total,
+        reverse=True
+    )[:3]
 
-        transactions_list = [
-            ReportTransaction(
-                id=transaction.id,
-                amount=transaction.amount,
-                description=transaction.description,
-                date=transaction.date,
-                category=transaction.category.name if transaction.category else "Sin categoría",
-            )
-        ]
+    transactions_list = [
+        ReportTransaction(
+            id=transaction.id,
+            amount=transaction.amount,
+            description=transaction.description,
+            date=transaction.date,
+            category=transaction.category.name if transaction.category else "Sin categoría",
+        )
+        for transaction in transactions_data
+    ]
 
     # Final response
     return ReportResponse(

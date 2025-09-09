@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date
 
 from sqlalchemy import update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ async def create_transaction(db: AsyncSession, user_id: int, transaction: Transa
         amount=transaction.amount,
         description=transaction.description,
         category_id=transaction.category_id,
-        date=datetime.now(timezone.utc),
+        date=date.today(),
     )
     db.add(new_transaction)
     await db.commit()

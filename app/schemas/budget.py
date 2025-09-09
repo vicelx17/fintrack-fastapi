@@ -7,8 +7,8 @@ from pydantic import BaseModel, model_validator, ConfigDict
 class BudgetBase(BaseModel):
     name: str
     amount: float
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     category_id: Optional[int] = None
 
     @model_validator(mode="after")

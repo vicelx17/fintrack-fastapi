@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import timezone, timedelta, date
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/", response_model=ReportResponse)
 async def get_custom_report(
-        start_date: datetime = Query(None, description="Start date"),
-        end_date: datetime = Query(None, description="End date"),
+        start_date: date = Query(None, description="Start date"),
+        end_date: date = Query(None, description="End date"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
@@ -34,7 +34,7 @@ async def get_weekly_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    end_date = datetime.now(timezone.utc)
+    end_date = date.today()
     start_date = end_date - timedelta(days=7)
 
     weekly_report = await generate_report(
@@ -50,7 +50,7 @@ async def get_monthly_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    end_date = datetime.now(timezone.utc)
+    end_date = date.today()
     start_date = end_date - timedelta(days=30)
 
     monthly_report = await generate_report(

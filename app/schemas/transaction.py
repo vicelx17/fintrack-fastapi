@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel
@@ -18,7 +18,7 @@ class TransactionUpdate(TransactionBase):
 class TransactionResponse(TransactionBase):
     id: int
     user_id: int
-    date: datetime
+    date: date
 
     class Config:
         orm_mode = True

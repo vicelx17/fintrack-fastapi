@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
-
-from sqlalchemy import Column, Integer, Float, ForeignKey, TIMESTAMP, String
+from sqlalchemy import Column, Integer, Float, ForeignKey, TIMESTAMP, String, Date
 
 from sqlalchemy.orm import relationship
 
@@ -14,8 +13,8 @@ class Budget(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    start_date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
-    end_date = Column(TIMESTAMP(timezone=True), default=datetime.now(timezone.utc), nullable=False)
+    start_date = Column(Date, default=date.today(), nullable=False)
+    end_date = Column(Date, default=date.today(), nullable=False)
 
     # FK
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
