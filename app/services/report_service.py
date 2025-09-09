@@ -42,11 +42,11 @@ async def generate_report(
 
     for transaction in transactions_data:
         category_name = transaction.category.name if transaction.category else "Sin categoría"
-        category_totals[category_name] = category_totals.get(category_name, 0) + abs(transaction.amount)
+        category_totals[category_name] = category_totals.get(category_name, 0) + transaction.amount
 
     top_categories = sorted(
-        [ReportCategory(category=name, total=total) for name, total in category_totals.items()],
-        key=lambda c: c.total,
+        [ReportCategory(category=name, net_category_balance=balance) for name, balance in category_totals.items()],
+        key=lambda c: c.net_category_balance    ,
         reverse=True
     )[:3]
 
