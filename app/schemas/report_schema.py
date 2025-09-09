@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class ReportCategory(BaseModel):
     category: str
-    net_category_balance: int
+    net_category_balance: float
 
 class ReportTransaction(BaseModel):
     id: int

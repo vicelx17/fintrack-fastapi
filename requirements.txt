@@ -9,4 +9,5 @@ bcrypt
 passlib[bcrypt]
 python-multipart
 pydantic[email]
-pytest
+reportlab
+matplotlib
