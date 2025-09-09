@@ -1,33 +1,29 @@
-from datetime import datetime, timedelta, timezone
-from typing import List
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.category import Category
 from app.models.transaction import Transaction
 from app.schemas.report_schema import ReportResponse, ReportTransaction, ReportCategory
 
 
-async def generate_report(db:AsyncSession ,user_id: int,days: int) -> ReportResponse:
-    """
-    Genera un reporte financiero para el usuario autenticado.
-    :param days: numero de días hacia atras desde hoy
-    """
-    now = datetime.now(timezone.utc)
-    start_date = now - timedelta(days=days)
+async def generate_report(
+        db:AsyncSession ,
+        user_id: int,
+        start_date: Optional[datetime]=None,
+        end_date: Optional[datetime]=None) -> ReportResponse:
 
-    result = await db.execute(
-        select(Transaction, Category.name)
-        .join(Category, Transaction.category_id == Category.id)
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.date >= start_date,
-            Transaction.date <= now,
-        )
-        .order_by(Transaction.date.desc())
-    )
-    transactions_data = result.all()
+
+    query = select(Transaction).where(Transaction.user_id == user_id)
+
+    if start_date:
+        query = query.where(Transaction.date >= start_date)
+    if end_date:
+        query = query.where(Transaction.date <= end_date)
+
+    result = await db.execute(query)
+    transactions_data = result.scalars().all()
 
     if not transactions_data:
         return ReportResponse(
@@ -38,42 +34,40 @@ async def generate_report(db:AsyncSession ,user_id: int,days: int) -> ReportResp
             transactions=[]
         )
 
-    total_income = 0.0,
-    total_expenses = 0.0,
-    transactions_list: List[ReportTransaction] = []
+    total_income = sum(t.amount for t in transactions_data if t.amount > 0)
+    total_expenses = sum(abs(t.amount) for t in transactions_data if t.amount < 0)
+    net_balance = total_income - total_expenses
 
     category_totals = {}
 
-    for transaction, category_name in transactions_data:
-        if transaction.amount >= 0:
-            total_income += transaction.amount
+    for transaction in transactions_data:
+        if transaction.category_id:
+            category_name = transaction.category.name if transaction.category else "Sin categoría"
+            category_totals[category_name] = category_totals.get(category_name, 0) + transaction.amount
         else:
             total_expenses += abs(transaction.amount)
 
-        if category_name not in category_totals:
-            category_totals[category_name] = 0.0
-        category_totals[category_name] += abs(transaction.amount)
+        top_categories = sorted(
+            [ReportCategory(category=name, total=total) for name, total in category_totals.items()],
+            key=lambda c: abs(c.total),
+            reverse=True
+        )[:3]
 
-        transactions_list.append(ReportTransaction(
-            id=transaction.id,
-            amount=transaction.amount,
-            description=transaction.description,
-            date=transaction.date,
-            category=category_name,
-        )
-    )
-
-    top_categories_list = sorted(
-        [ReportCategory(category = k, total = v) for k, v in category_totals.items()],
-        key = lambda x: x.total,
-        reverse = True
-    )[:3]
+        transactions_list = [
+            ReportTransaction(
+                id=transaction.id,
+                amount=transaction.amount,
+                description=transaction.description,
+                date=transaction.date,
+                category=transaction.category.name if transaction.category else "Sin categoría",
+            )
+        ]
 
     # Final response
     return ReportResponse(
-        total_income=round(total_income,2),
-        total_expenses=round(total_expenses,2),
-        net_balance=round(total_income - total_expenses,2),
-        top_categories=top_categories_list,
+        total_income=total_income,
+        total_expenses=total_expenses,
+        net_balance=net_balance,
+        top_categories=top_categories,
         transactions=transactions_list
     )
