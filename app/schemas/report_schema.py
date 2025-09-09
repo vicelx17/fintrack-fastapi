@@ -20,7 +20,7 @@ class ReportTransaction(BaseModel):
 
 class ReportResponse(BaseModel):
     total_income: float
-    total_expense: float
+    total_expenses: float
     net_balance: float
     top_categories: List[ReportCategory]
     transactions: List[ReportTransaction]
