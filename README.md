@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)  
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-green.svg)](https://fastapi.tiangolo.com/)  
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org/)  
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)  
 [![Docker](https://img.shields.io/badge/Docker-ready-0db7ed.svg)](https://www.docker.com/)  
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)  
 
@@ -24,9 +24,9 @@ Construida para ser rápida, escalable y lista para producción.
 
 ✅Registro/Login de usuarios con JWT
 
-⌛CRUD de ingresos y gastos
+✅CRUD de ingresos y gastos
 
-⌛Reportes financieros (resúmenes, balance mensual)
+✅Reportes financieros (resúmenes, balance mensual)
 
 ⌛Integración con IA (predicciones de gasto futuro)
 
