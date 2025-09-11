@@ -252,11 +252,11 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
         colWidths=[1.5 * inch, 2.5 * inch, 1 * inch, 1.5 * inch]
     )
 
-    # AQUÍ ESTÁ EL FIX PRINCIPAL - COLORES VERDES Y ESPACIADO ARREGLADO
+
     transactions_table.setStyle(
         TableStyle(
             [
-                # HEADER - Verde oscuro profesional (SIN espacio extra)
+                # HEADER - Verde oscuro profesional
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),

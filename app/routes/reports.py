@@ -3,7 +3,7 @@ from datetime import timedelta, date
 from fastapi import APIRouter, Query, Depends, HTTPException
 from fontTools.misc.plistlib import end_date
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import StreamingResponse
+from starlette.responses import StreamingResponse, JSONResponse
 
 from app.core.database import get_db
 from app.models.user import User
@@ -84,7 +84,7 @@ async def export_report_pdf(
 
 
 @router.get("/generate/custom_pdf")
-async def get_custom_report(
+async def export_custom_pdf_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
         start_date: date = Query(None, description="Start date"),
@@ -93,13 +93,13 @@ async def get_custom_report(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
 
-    custom_report_data = await generate_report(
+    report_data = await generate_report(
         db=db,
         user_id=current_user.id,
         start_date=start_date,
         end_date=end_date,
     )
-    pdf_file = await generate_pdf_report(custom_report_data)
+    pdf_file = await generate_pdf_report(report_data)
     return StreamingResponse(
         pdf_file,
         media_type="application/pdf",
@@ -117,13 +117,13 @@ async def export_weekly_pdf(
     end_date = date.today()
     start_date = end_date - timedelta(days=7)
 
-    report_weekly_data = await generate_report(
+    report_data = await generate_report(
         db,
         current_user.id,
         start_date=start_date,
         end_date=end_date,
     )
-    pdf_file = await generate_pdf_report(report_weekly_data)
+    pdf_file = await generate_pdf_report(report_data)
     return StreamingResponse(
         pdf_file,
         media_type="application/pdf",
@@ -153,5 +153,97 @@ async def export_monthly_pdf(
         media_type="application/pdf",
         headers={
             "Content-Disposition": "attachment; filename=financial_monthly_report.pdf"
+        }
+    )
+
+@router.get("/generate/json")
+async def export_json_report(
+    db: AsyncSession = Depends(get_db),
+    start_date: date = None,
+    end_date: date = None,
+    current_user: User = Depends(get_current_user)
+):
+    report_data = await generate_report(
+        db,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    data = report_data.model_dump(mode="json")
+
+    return JSONResponse(
+        content=data,
+        headers={
+            "Content-Disposition": f"attachment; filename=report_{current_user.username}.json"
+        }
+    )
+
+@router.get("/generate/custom_json")
+async def export_custom_json_report(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+        start_date: date = Query(None, description="Start date"),
+        end_date: date = Query(None, description="End date")
+):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=400, detail="Start date must be before end date")
+
+    report_data = await generate_report(
+        db=db,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    data = report_data.model_dump(mode="json")
+    return JSONResponse(
+        content=data,
+        headers={
+            "Content-Disposition": f"attachment; filename=custom_report_{current_user.username}.json"
+        }
+    )
+
+@router.get("/generate/weekly_json")
+async def export_weekly_json_report(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+        end_date: date = date.today(),
+        start_date: date = date.today() - timedelta(days=7)
+):
+
+    report_data = await generate_report(
+        db=db,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    data = report_data.model_dump(mode="json")
+    return JSONResponse(
+        content=data,
+        headers={
+            "Content-Disposition": f"attachment; filename=custom_report_{current_user.username}.json"
+        }
+    )
+
+
+@router.get("/generate/monthly_json")
+async def export_monthly_json_report(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+        end_date: date = date.today(),
+        start_date: date = date.today() - timedelta(days=30)
+):
+
+    report_data = await generate_report(
+        db=db,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    data = report_data.model_dump(mode="json")
+    return JSONResponse(
+        content=data,
+        headers={
+            "Content-Disposition": f"attachment; filename=custom_report_{current_user.username}.json"
         }
     )
