@@ -13,7 +13,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=False)
-    date = Column(Date, default=date.today(), nullable=False)
+    transaction_date = Column(Date, default=date.today(), nullable=False)
 
     #FK
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

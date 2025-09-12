@@ -12,7 +12,7 @@ class ReportTransaction(BaseModel):
     id: int
     amount: float
     description: str
-    date: date
+    report_date: date
     category: str
 
     class Config:
