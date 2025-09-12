@@ -13,7 +13,11 @@ from app.services.transaction_service import get_transactions, create_transactio
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
-@router.get("/", response_model=List[TransactionResponse])
+@router.get("/",
+            response_model=List[TransactionResponse],
+            summary="Get all user transactions",
+            description="Allows the user to get all of their transactions",
+            )
 async def list_user_transactions(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await get_transactions(db, current_user.id)
 
@@ -28,30 +32,12 @@ async def create_new_transaction(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """
-        Example of **request body**:
-        ```json
-        {
-          "amount": -30.0,
-          "description": "Dinning in a restaurant",
-          "category_id": 3
-        }
-        ```
-
-        Example of **response**:
-        ```json
-        {
-          "id": 101,
-          "amount": -30.0,
-          "description": "Dinning in a restaurant",
-          "category_id": 3,
-          "date": "2025-09-09"
-        }
-        ```
-        """
     return await create_transaction(db, current_user.id, transaction)
 
-@router.put("/{id}", response_model=TransactionResponse)
+@router.put("/{id}",
+            response_model=TransactionResponse,
+            summary="Update an existing transaction",
+            description="Allows the authenticated user to update an existing transaction",)
 async def update_user_transaction(
         id: int,
         transaction: TransactionUpdate,
@@ -63,7 +49,9 @@ async def update_user_transaction(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return tx
 
-@router.delete("/{id}")
+@router.delete("/{id}",
+               summary="Delete an existing transaction",
+               description="Allows the authenticated user to delete an existing transaction",)
 async def delete_user_transaction(
         id: int,
         db: AsyncSession = Depends(get_db),
