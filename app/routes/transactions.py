@@ -17,12 +17,38 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 async def list_user_transactions(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await get_transactions(db, current_user.id)
 
-@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/",
+             response_model=TransactionResponse,
+             status_code=status.HTTP_201_CREATED,
+             summary="Create a new transaction",
+             description="Allows the authenticated user to create a new transaction associated to an existing category",
+             )
 async def create_new_transaction(
         transaction: TransactionCreate,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """
+        Example of **request body**:
+        ```json
+        {
+          "amount": -30.0,
+          "description": "Dinning in a restaurant",
+          "category_id": 3
+        }
+        ```
+
+        Example of **response**:
+        ```json
+        {
+          "id": 101,
+          "amount": -30.0,
+          "description": "Dinning in a restaurant",
+          "category_id": 3,
+          "date": "2025-09-09"
+        }
+        ```
+        """
     return await create_transaction(db, current_user.id, transaction)
 
 @router.put("/{id}", response_model=TransactionResponse)
