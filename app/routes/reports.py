@@ -1,7 +1,6 @@
 from datetime import timedelta, date
 
 from fastapi import APIRouter, Query, Depends, HTTPException
-from fontTools.misc.plistlib import end_date
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse, JSONResponse
 
@@ -14,7 +13,8 @@ from app.services.report_service import generate_report, generate_pdf_report
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
-@router.get("/custom", response_model=ReportResponse)
+@router.get("/custom", summary="Generate Custom Report",
+            description="Generate a financial report for a custom date range", response_model=ReportResponse)
 async def get_custom_report(
         start_date: date = Query(None, description="Start date"),
         end_date: date = Query(None, description="End date"),
@@ -33,7 +33,8 @@ async def get_custom_report(
     return report
 
 
-@router.get("/weekly", response_model=ReportResponse)
+@router.get("/weekly", summary="Generate Weekly Report",
+            description="Generate a financial report for the last 7 days", response_model=ReportResponse)
 async def get_weekly_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
@@ -50,7 +51,8 @@ async def get_weekly_report(
     return weekly_report
 
 
-@router.get("/monthly", response_model=ReportResponse)
+@router.get("/monthly", summary="Generate Monthly Report",
+            description="Generate a financial report for the last 30 days", response_model=ReportResponse)
 async def get_monthly_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
@@ -67,7 +69,10 @@ async def get_monthly_report(
     return monthly_report
 
 
-@router.get("/generate/pdf")
+@router.get("/generate/pdf",
+            summary="Export Report as PDF",
+            description="Generate and download a complete financial report as PDF"
+            )
 async def export_report_pdf(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
@@ -83,7 +88,9 @@ async def export_report_pdf(
     )
 
 
-@router.get("/generate/custom_pdf")
+@router.get("/generate/custom_pdf",
+            summary="Export PDF report with custom date ranges",
+            description="Generate and download a complete financial report as PDF")
 async def export_custom_pdf_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
@@ -109,7 +116,9 @@ async def export_custom_pdf_report(
     )
 
 
-@router.get("/generate/weekly_pdf")
+@router.get("/generate/weekly_pdf",
+            summary="Export Weekly PDF report with last 7 days",
+            description="Generate and download a complete financial report in PDF format for the last 7 days")
 async def export_weekly_pdf(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
@@ -133,7 +142,9 @@ async def export_weekly_pdf(
     )
 
 
-@router.get("/generate/monthly_pdf")
+@router.get("/generate/monthly_pdf",
+            summary="Export Monthly PDF report with last 30 days",
+            description="Generate and download a complete financial report in PDF format for the last 30 days")
 async def export_monthly_pdf(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
@@ -156,12 +167,15 @@ async def export_monthly_pdf(
         }
     )
 
-@router.get("/generate/json")
+
+@router.get("/generate/json",
+            summary="Generate JSON Report",
+            description="Generate report as JSON", )
 async def export_json_report(
-    db: AsyncSession = Depends(get_db),
-    start_date: date = None,
-    end_date: date = None,
-    current_user: User = Depends(get_current_user)
+        db: AsyncSession = Depends(get_db),
+        start_date: date = None,
+        end_date: date = None,
+        current_user: User = Depends(get_current_user)
 ):
     report_data = await generate_report(
         db,
@@ -179,7 +193,10 @@ async def export_json_report(
         }
     )
 
-@router.get("/generate/custom_json")
+
+@router.get("/generate/custom_json",
+            summary="Generate JSON Report with custom date ranges",
+            description="Generate report as JSON")
 async def export_custom_json_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
@@ -203,14 +220,16 @@ async def export_custom_json_report(
         }
     )
 
-@router.get("/generate/weekly_json")
+
+@router.get("/generate/weekly_json",
+            summary="Generate weekly JSON Report",
+            description="Generate report as JSON format for the last 7 days.")
 async def export_weekly_json_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
         end_date: date = date.today(),
         start_date: date = date.today() - timedelta(days=7)
 ):
-
     report_data = await generate_report(
         db=db,
         user_id=current_user.id,
@@ -226,14 +245,15 @@ async def export_weekly_json_report(
     )
 
 
-@router.get("/generate/monthly_json")
+@router.get("/generate/monthly_json",
+            summary="Generate monthly JSON Report",
+            description="Generate report as JSON format for the last 30 days.")
 async def export_monthly_json_report(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
         end_date: date = date.today(),
         start_date: date = date.today() - timedelta(days=30)
 ):
-
     report_data = await generate_report(
         db=db,
         user_id=current_user.id,
