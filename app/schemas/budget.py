@@ -1,37 +1,111 @@
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, model_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator
 
 
 class BudgetBase(BaseModel):
-    name: str
-    amount: float
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    category_id: Optional[int] = None
+    """Base budget model with common fields for budget operations."""
+
+    name: str = Field(
+        ...,
+        description="Name of the budget.",
+        examples=["Monthly Food Budget"],
+        min_length=1,
+        max_length=100
+    )
+    amount: float = Field(
+        ...,
+        description="Budget amount limit. Must be positive.",
+        examples=[1000.00],
+        gt=0
+    )
+    start_date: Optional[date] = Field(
+        None,
+        description="Start date for the budget period. If not provided, budget has no start date restriction.",
+        examples=["2025-01-01"]
+    )
+    end_date: Optional[date] = Field(
+        None,
+        description="End date for the budget period. If not provided, budget has no end date restriction.",
+        examples=["2025-12-31"]
+    )
+    category_id: Optional[int] = Field(
+        None,
+        description="ID of the category this budget applies to. If not provided, applies to all categories.",
+        examples=[1],
+        gt=0
+    )
 
     @model_validator(mode="after")
     def validate_dates(self):
+        """Validate that start_date is not after end_date."""
         if self.start_date is not None and self.end_date is not None:
             if self.start_date > self.end_date:
-                raise ValueError("start_date must be <= before end_date")
+                raise ValueError("start_date must be before or equal to end_date")
         return self
 
+
 class BudgetCreate(BudgetBase):
+    """Schema for creating a new budget."""
     pass
 
+
 class BudgetUpdate(BaseModel):
-    amount: Optional[float] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    category_id: Optional[int] = None
+    """Schema for updating an existing budget. All fields are optional."""
+
+    name: Optional[str] = Field(
+        None,
+        description="Updated name of the budget.",
+        examples=["Updated Monthly Food Budget"],
+        min_length=1,
+        max_length=100
+    )
+    amount: Optional[float] = Field(
+        None,
+        description="Updated budget amount limit. Must be positive.",
+        examples=[1200.00],
+        gt=0
+    )
+    start_date: Optional[date] = Field(
+        None,
+        description="Updated start date for the budget period.",
+        examples=["2025-02-01"]
+    )
+    end_date: Optional[date] = Field(
+        None,
+        description="Updated end date for the budget period.",
+        examples=["2025-12-31"]
+    )
+    category_id: Optional[int] = Field(
+        None,
+        description="Updated category ID this budget applies to.",
+        examples=[2],
+        gt=0
+    )
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        """Validate that start_date is not after end_date when both are provided."""
+        if self.start_date is not None and self.end_date is not None:
+            if self.start_date > self.end_date:
+                raise ValueError("start_date must be before or equal to end_date")
+        return self
+
 
 class BudgetResponse(BudgetBase):
-    name: str
-    amount: float
-    id: int
-    user_id: int
+    """Schema for budget responses, including database fields."""
+
+    id: int = Field(
+        ...,
+        description="Unique identifier for the budget.",
+        examples=[1]
+    )
+    user_id: int = Field(
+        ...,
+        description="ID of the user who owns this budget.",
+        examples=[123]
+    )
 
     class Config:
-        from_attributes: True
+        from_attributes = True
