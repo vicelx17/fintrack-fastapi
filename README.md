@@ -28,7 +28,7 @@ Construida para ser rápida, escalable y lista para producción.
 
 ✅Reportes financieros (resúmenes, balance mensual)
 
-⌛Integración con IA (predicciones de gasto futuro)
+✅Integración con IA (predicciones de gasto futuro)
 
 ⌛Deploy en la nube (Render/Heroku/VPS)
 
