@@ -14,7 +14,7 @@ async def create_transaction(db: AsyncSession, user_id: int, transaction: Transa
         amount=transaction.amount,
         description=transaction.description,
         category_id=transaction.category_id,
-        date=date.today(),
+        transaction_date=date.today(),
     )
     db.add(new_transaction)
     await db.commit()
