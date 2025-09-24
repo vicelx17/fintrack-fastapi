@@ -37,6 +37,20 @@ class TokenResponse(BaseModel):
 
 class RegisterBody(BaseModel):
     """Schema for user registration requests."""
+    first_name: str = Field(
+        ...,
+        description="First name of the user.",
+        examples=["Peter"],
+        min_length=3,
+        max_length=50,
+    )
+    last_name: str = Field(
+        ...,
+        description="Last name of the user.",
+        examples=["Parker"],
+        min_length=3,
+        max_length=50,
+    )
 
     username: str = Field(
         ...,

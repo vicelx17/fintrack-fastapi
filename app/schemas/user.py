@@ -25,33 +25,6 @@ class UserBase(BaseModel):
         examples=["user", "admin"]
     )
 
-
-class UserCreate(UserBase):
-    """Schema for creating a new user account."""
-    first_name: str = Field(
-        ...,
-        description="First name of the user.",
-        examples=["Peter"],
-        min_length=3,
-        max_length=50,
-    )
-    last_name: str = Field(
-        ...,
-        description="Last name of the user.",
-        examples=["Parker"],
-        min_length=3,
-        max_length=50,
-    )
-
-    password: str = Field(
-        ...,
-        description="User's password. Should be strong and secure.",
-        examples=["SecurePassword123!"],
-        min_length=8,
-        max_length=128
-    )
-
-
 class UserUpdate(BaseModel):
     """Schema for updating an existing user. All fields are optional."""
     first_name: Optional[str] = Field(

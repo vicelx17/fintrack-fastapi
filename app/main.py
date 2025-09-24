@@ -19,7 +19,7 @@ origins = [
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         # Eliminamos por si hacemos cambios en las tablas
-        # await conn.run_sync(Base.metadata.drop_all)
+        #await conn.run_sync(Base.metadata.drop_all)
         # Crear tablas si no existen
         await conn.run_sync(Base.metadata.create_all)
     yield
