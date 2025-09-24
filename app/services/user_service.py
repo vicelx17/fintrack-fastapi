@@ -19,7 +19,7 @@ async def get_user_by_id(db: AsyncSession, user_id: int):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-async def register_user(db: AsyncSession, username: str, email: str, password: str, role: str) -> User:
+async def register_user(db: AsyncSession,first_name:str, last_name:str, username: str, email: str, password: str, role: str) -> User:
     result = await db.execute(select(User).filter(User.username == username))
     existing_user = result.scalars().first()
     if existing_user:
@@ -29,6 +29,8 @@ async def register_user(db: AsyncSession, username: str, email: str, password: s
         )
 
     new_user = User(
+        first_name=first_name,
+        last_name=last_name,
         username=username,
         email=email,
         hashed_password=hash_password(password),

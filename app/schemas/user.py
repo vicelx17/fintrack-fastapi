@@ -28,6 +28,20 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Schema for creating a new user account."""
+    first_name: str = Field(
+        ...,
+        description="First name of the user.",
+        examples=["Peter"],
+        min_length=3,
+        max_length=50,
+    )
+    last_name: str = Field(
+        ...,
+        description="Last name of the user.",
+        examples=["Parker"],
+        min_length=3,
+        max_length=50,
+    )
 
     password: str = Field(
         ...,
@@ -40,7 +54,20 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     """Schema for updating an existing user. All fields are optional."""
-
+    first_name: Optional[str] = Field(
+        None,
+        description="First name of the user.",
+        examples=["Peter"],
+        min_length=3,
+        max_length=50,
+    )
+    last_name: Optional[str] = Field(
+        None,
+        description="Last name of the user.",
+        examples=["Parker"],
+        min_length=3,
+        max_length=50,
+    )
     username: Optional[str] = Field(
         None,
         description="Updated username for the user account.",
