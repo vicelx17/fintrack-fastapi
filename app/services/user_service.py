@@ -1,10 +1,10 @@
-from sqlalchemy import delete, update
+from fastapi import HTTPException, status
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import HTTPException, status
 
-from app.models.user import User
 from app.core.security import hash_password
+from app.models.user import User
 from app.schemas.user import UserUpdate
 
 

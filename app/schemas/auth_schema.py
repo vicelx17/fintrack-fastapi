@@ -60,7 +60,7 @@ class RegisterBody(BaseModel):
         max_length=50,
         pattern="^[a-zA-Z0-9_]+$"  # Only alphanumeric and underscores
     )
-    email: EmailStr = Field(
+    email: str = Field(
         ...,
         description="Email address for the new account. Must be unique and valid.",
         examples=["vicelx.dev@example.com"]
