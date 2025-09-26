@@ -1,10 +1,9 @@
 from datetime import date, timedelta
 from typing import Dict, List
 
-from fontTools.misc.plistlib import end_date
 from sqlalchemy import func, and_, extract
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.budget import Budget
@@ -117,35 +116,46 @@ async def calculate_financial_summary(db: AsyncSession, user_id: int) -> Dict:
         }
 
 
-async def get_monthly_chart_data(db: AsyncSession, user_id: int, months: int = 6) -> List[Dict]:
+async def get_monthly_chart_data(db: AsyncSession, user_id: int, months: int = 12) -> List[Dict]:
     """
     Obtain data for the monthly chart for de last 6 months
     """
     end_date = date.today()
     start_date = end_date - timedelta(days=months * 30)
 
-    monthly_data = await db.execute(
+    income_data = await db.execute(
         select(
             extract('year', Transaction.transaction_date).label('year'),
             extract('month', Transaction.transaction_date).label('month'),
-            func.sum(
-                func.case((Transaction.amount > 0, Transaction.amount), else_=0)
-            ).label('incomes'),
-            func.sum(
-                func.case((Transaction.amount < 0, func.abs(Transaction.amount)), else_=0)
-            ).label('expenses')
+            func.sum(Transaction.amount).label('ingresos')
         )
         .where(
             and_(
                 Transaction.user_id == user_id,
-                Transaction.transaction_date >= start_date,
+                Transaction.amount > 0,
+                Transaction.transaction_date >= start_date
             )
         )
         .group_by(
             extract('year', Transaction.transaction_date),
             extract('month', Transaction.transaction_date)
         )
-        .order_by(
+    )
+
+    expense_data = await db.execute(
+        select(
+            extract('year', Transaction.transaction_date).label('year'),
+            extract('month', Transaction.transaction_date).label('month'),
+            func.sum(func.abs(Transaction.amount)).label('gastos')
+        )
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.amount < 0,
+                Transaction.transaction_date >= start_date
+            )
+        )
+        .group_by(
             extract('year', Transaction.transaction_date),
             extract('month', Transaction.transaction_date)
         )
@@ -156,20 +166,32 @@ async def get_monthly_chart_data(db: AsyncSession, user_id: int, months: int = 6
         7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
     }
 
+    income_dict = {}
+    for row in income_data:
+        key = (int(row.year), int(row.month))
+        income_dict[key] = float(row.ingresos or 0)
+
+    expense_dict = {}
+    for row in expense_data:
+        key = (int(row.year), int(row.month))
+        expense_dict[key] = float(row.gastos or 0)
+
+    # Combinar datos
+    all_months = set(income_dict.keys()) | set(expense_dict.keys())
     data = []
-    for row in monthly_data:
-        month_name = months_map.get(int(row.month), str(row.month))
-        incomes = float(row.incomes or 0)
-        expenses = float(row.expenses or 0)
+
+    for year, month in sorted(all_months):
+        month_name = months_map.get(month, str(month))
+        incomes = income_dict.get((year, month), 0.0)
+        expenses = expense_dict.get((year, month), 0.0)
         balance = incomes - expenses
 
         data.append({
             "month": month_name,
             "incomes": round(incomes, 2),
             "expenses": round(expenses, 2),
-            "balance": round(balance, 2),
+            "balance": round(balance, 2)
         })
-
     return data
 
 
@@ -266,7 +288,7 @@ async def get_budget_overview(db: AsyncSession, user_id: int) -> List[Dict]:
             )
         )
 
-        spent = float(spent_query.scalar()or 0)
+        spent = float(spent_query.scalar() or 0)
         budget_amount = float(budget.amount)
         percentage = (spent / budget_amount) * 100 if budget_amount > 0 else 0
         if percentage > 100:
@@ -286,6 +308,7 @@ async def get_budget_overview(db: AsyncSession, user_id: int) -> List[Dict]:
         })
 
     return data
+
 
 async def get_ai_insights_data(db: AsyncSession, user_id: int) -> Dict:
     """
