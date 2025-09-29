@@ -7,10 +7,9 @@ from starlette import status
 
 from app.core.database import get_db
 from app.models.user import User
-from app.services.ai_service import predict_future_transactions
 from app.services.auth_service import get_current_user
 from app.services.metrics_service import calculate_financial_summary, get_monthly_chart_data, get_category_chart_data, \
-    get_recent_transactions, get_budget_overview, get_ai_insights_data
+    get_recent_transactions, get_budget_overview
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
