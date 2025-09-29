@@ -155,54 +155,6 @@ async def get_budget_overview_endpoint(
             detail=f"Error getting budget overview: {str(e)}"
         )
 
-@router.get("/ai-insights",
-            summary="Get AI-powered financial insights",
-            description="Returns AI-generated insights and predictions based on user's transaction history and spending patterns.",
-            response_model=Dict)
-async def get_ai_insights_endpoint(
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    """
-    Obtain AI-insights data based in transaction patterns.
-    """
-    try:
-        insights_data = await get_ai_insights_data(db, current_user.id)
-        if not insights_data["transactions"]:
-            return {
-                "success": True,
-                "data":{
-                    "insights": [],
-                    "message": "No hay suficientes transacciones para generar insights"
-                }
-            }
-
-        ai_response = await predict_future_transactions(insights_data["transactions"])
-        if "error" in ai_response:
-            return {
-                "success": False,
-                "error": "AI service unavailable",
-                "data": {
-                    "insights": [],
-                    "message": "Los insights de IA no están disponibles temporalmente."
-                }
-            }
-        return {
-            "success": True,
-            "data": {
-                "insights": ai_response.get("predictions", []),
-                "user_id": current_user.id,
-                "analysis_date": insights_data.get("analysis_date"),
-                "transactions_analyzed": len(insights_data["transactions"]),
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting AI-insights: {str(e)}"
-        )
-
 @router.get("/complete",
             summary="Get complete dashboard data",
             description="Returns all dashboard data in a single request for initial page load optimization.",
