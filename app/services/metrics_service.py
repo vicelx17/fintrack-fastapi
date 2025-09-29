@@ -308,31 +308,3 @@ async def get_budget_overview(db: AsyncSession, user_id: int) -> List[Dict]:
         })
 
     return data
-
-
-async def get_ai_insights_data(db: AsyncSession, user_id: int) -> Dict:
-    """
-    Prepare data for AI insights
-    """
-    recent_transactions = await db.execute(
-        select(Transaction)
-        .options(selectinload(Transaction.category))
-        .where(Transaction.user_id == user_id)
-        .order_by(Transaction.transaction_date.desc())
-        .limit(100)
-    )
-
-    transactions_data = []
-    for transaction in recent_transactions.scalars():
-        transactions_data.append({
-            "id": transaction.id,
-            "amount": float(transaction.amount),
-            "description": transaction.description,
-            "date": transaction.transaction_date.isoformat(),
-            "category": transaction.category.name
-        })
-
-    return {
-        "transactions": transactions_data,
-        "user": user_id
-    }

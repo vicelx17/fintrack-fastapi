@@ -28,7 +28,7 @@ async def get_financial_summary(
     try:
         summary = await calculate_financial_summary(db, current_user.id)
         return {
-            "sucess": True,
+            "success": True,
             "data": summary
         }
     except Exception as e:
@@ -204,7 +204,7 @@ async def get_ai_insights_endpoint(
         )
 
 @router.get("/complete",
-            summary="Get complete dsashboard data",
+            summary="Get complete dashboard data",
             description="Returns all dashboard data in a single request for initial page load optimization.",
             response_model=Dict)
 async def get_complete_dashboard(

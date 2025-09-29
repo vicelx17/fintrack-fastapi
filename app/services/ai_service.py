@@ -6,6 +6,11 @@ from typing import Dict, List
 
 import google.generativeai as genai
 from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+
+from app.models.transaction import Transaction
 
 load_dotenv()
 
@@ -37,7 +42,7 @@ async def predict_future_transactions(user_transactions: list[dict]) -> dict:
     User transactions: {user_transactions}
     """
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     response = model.generate_content(prompt)
 
     return extract_json_from_response(response.text)
@@ -127,7 +132,7 @@ async def generate_financial_insights(
     """
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(prompt)
 
         result = extract_json_from_response(response.text)
@@ -152,7 +157,7 @@ def generate_fallback_insights(financial_summary: Dict, budget_status: List, cat
     total_expenses = financial_summary.get('monthly_expenses', 0)
 
     if total_expenses > 0:
-        next_month_prediction = total_expenses * 1.05  # Estimación conservadora +5%
+        next_month_prediction = total_expenses * 1.05
         insights.append({
             "type": "prediction",
             "title": "Predicción de Gastos",
@@ -186,7 +191,7 @@ def generate_fallback_insights(financial_summary: Dict, budget_status: List, cat
         })
     if category_expenses:
         highest_category = max(category_expenses.items(), key=lambda x: x[1])
-        potential_saving = highest_category[1] * 0.15  # 15% de la categoría más alta
+        potential_saving = highest_category[1] * 0.15
         insights.append({
             "type": "tip",
             "title": "Oportunidad de Ahorro",
@@ -281,3 +286,30 @@ async def analyze_spending_trends(transactions: List[Dict]) -> Dict:
                 "message": "Tus gastos se mantienen estables",
                 "percentage": 0
             }
+
+async def get_ai_insights_data(db: AsyncSession, user_id: int) -> Dict:
+    """
+    Prepare data for AI insights
+    """
+    recent_transactions = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.category))
+        .where(Transaction.user_id == user_id)
+        .order_by(Transaction.transaction_date.desc())
+        .limit(100)
+    )
+
+    transactions_data = []
+    for transaction in recent_transactions.scalars():
+        transactions_data.append({
+            "id": transaction.id,
+            "amount": float(transaction.amount),
+            "description": transaction.description,
+            "date": transaction.transaction_date.isoformat(),
+            "category": transaction.category.name
+        })
+
+    return {
+        "transactions": transactions_data,
+        "user": user_id
+    }
