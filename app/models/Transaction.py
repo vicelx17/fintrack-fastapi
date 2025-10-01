@@ -1,7 +1,6 @@
-from datetime import date, timezone
+from datetime import date
 
-
-from sqlalchemy import Column, Integer, ForeignKey, Float, String, TIMESTAMP, Date
+from sqlalchemy import Column, Integer, ForeignKey, Float, String, Date
 from sqlalchemy.orm import relationship
 
 from app.core import Base
@@ -14,6 +13,10 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=False)
     transaction_date = Column(Date, default=date.today(), nullable=False)
+    created_at = Column(Date, default=date.today, nullable=False)
+    updated_at = Column(Date, default=date.today, onupdate=date.today, nullable=False)
+    type = Column(String, nullable=False)
+    notes = Column(String, nullable=False)
 
     #FK
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
