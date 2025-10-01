@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from collections import defaultdict
 from datetime import date
 from typing import Dict, List
 
@@ -146,6 +147,225 @@ async def generate_financial_insights(
         print(f"Error generando insights: con IA: {e}")
         return generate_fallback_insights(financial_summary, budget_status, category_expenses)
 
+async def generate_spending_predictions(transactions: List[Dict], timeframe: str = "1month") -> List[Dict]:
+    """
+    Generate spending predictions for different categories
+    """
+    if not transactions:
+        return []
+
+    # Group by category
+    category_data = defaultdict(list)
+    for tx in transactions:
+        if tx['amount'] < 0:
+            category_data[tx['category']].append(abs(tx['amount']))
+
+    predictions = []
+    for category, amounts in category_data.items():
+        if len(amounts) >= 3:
+            avg = sum(amounts) / len(amounts)
+            std_dev = (sum((x - avg) ** 2 for x in amounts) / len(amounts)) ** 0.5
+            confidence = min(0.9, 1 - (std_dev / avg) if avg > 0 else 0.5)
+
+            predictions.append({
+                "type": "spending",
+                "current": round(sum(amounts[-4:]) / min(4, len(amounts)), 2),
+                "predicted": round(avg, 2),
+                "confidence": round(confidence, 2),
+                "timeframe": timeframe,
+                "factors": [f"Categoría: {category}", f"Variabilidad: {'Baja' if confidence > 0.7 else 'Alta'}"]
+            })
+
+    return predictions
+
+
+async def generate_balance_forecast(transactions: List[Dict], timeframe: str = "6months") -> Dict:
+    """
+    Generate balance forecast with different scenarios
+    """
+    if not transactions:
+        return None
+
+    # Calculate trends
+    income = sum(tx['amount'] for tx in transactions if tx['amount'] > 0)
+    expenses = sum(abs(tx['amount']) for tx in transactions if tx['amount'] < 0)
+    monthly_avg_income = income / max(1, len(transactions) / 30)
+    monthly_avg_expenses = expenses / max(1, len(transactions) / 30)
+
+    months_map = {"3months": 3, "6months": 6, "1year": 12}
+    months = months_map.get(timeframe, 6)
+
+    net_monthly = monthly_avg_income - monthly_avg_expenses
+    current_balance = income - expenses
+
+    return {
+        "timeframe": timeframe,
+        "scenarios": {
+            "optimistic": {
+                "balance": round(current_balance + (net_monthly * months * 1.15), 2),
+                "probability": 0.25
+            },
+            "realistic": {
+                "balance": round(current_balance + (net_monthly * months), 2),
+                "probability": 0.50
+            },
+            "conservative": {
+                "balance": round(current_balance + (net_monthly * months * 0.85), 2),
+                "probability": 0.25
+            }
+        },
+        "keyFactors": [
+            f"Ingreso mensual promedio: €{monthly_avg_income:.2f}",
+            f"Gasto mensual promedio: €{monthly_avg_expenses:.2f}",
+            f"Ahorro neto mensual: €{net_monthly:.2f}"
+        ],
+        "confidence": 0.75
+    }
+
+
+async def generate_smart_recommendations(
+        transactions: List[Dict],
+        budgets: List[Dict],
+        financial_summary: Dict
+) -> List[Dict]:
+    """
+    Generate actionable smart recommendations
+    """
+    recommendations = []
+    rec_id = 1
+
+    category_expenses = defaultdict(float)
+    for tx in transactions:
+        if tx['amount'] < 0:
+            category_expenses[tx['category']] += abs(tx['amount'])
+
+    # High spending category recommendation
+    if category_expenses:
+        highest_cat = max(category_expenses.items(), key=lambda x: x[1])
+        potential_saving = highest_cat[1] * 0.20
+
+        recommendations.append({
+            "id": f"rec_{rec_id}",
+            "type": "savings",
+            "title": f"Optimizar gastos en {highest_cat[0]}",
+            "description": f"Reducir un 20% el gasto en {highest_cat[0]} podría ahorrarte €{potential_saving:.2f}/mes",
+            "impact": "Alto",
+            "effort": "Medio",
+            "potentialSavings": round(potential_saving, 2),
+            "confidence": 0.75,
+            "category": highest_cat[0],
+            "actionable": True
+        })
+        rec_id += 1
+
+    # Budget recommendations
+    for budget in budgets:
+        if budget.get('status') == 'over':
+            recommendations.append({
+                "id": f"rec_{rec_id}",
+                "type": "alert",
+                "title": f"Presupuesto excedido: {budget['category']}",
+                "description": f"Has excedido el presupuesto en €{budget['spent'] - budget['budget']:.2f}",
+                "impact": "Alto",
+                "effort": "Bajo",
+                "potentialSavings": 0,
+                "confidence": 1.0,
+                "category": budget['category'],
+                "actionable": True
+            })
+            rec_id += 1
+
+    # Savings goal recommendation
+    total_income = financial_summary.get('monthly_income', 0)
+    total_expenses = financial_summary.get('monthly_expenses', 0)
+
+    if total_income > 0:
+        savings_rate = ((total_income - total_expenses) / total_income) * 100
+        if savings_rate < 20:
+            recommendations.append({
+                "id": f"rec_{rec_id}",
+                "type": "goal",
+                "title": "Aumentar tasa de ahorro",
+                "description": f"Tu tasa de ahorro es {savings_rate:.1f}%. Intenta alcanzar al menos 20%",
+                "impact": "Alto",
+                "effort": "Alto",
+                "potentialSavings": round((total_income * 0.20) - (total_income - total_expenses), 2),
+                "confidence": 0.80,
+                "actionable": True
+            })
+
+    return recommendations[:5]
+
+
+async def generate_risk_analysis(
+        transactions: List[Dict],
+        budgets: List[Dict],
+        financial_summary: Dict
+) -> Dict:
+    """
+    Analyze financial risks
+    """
+    total_income = financial_summary.get('monthly_income', 0)
+    total_expenses = financial_summary.get('monthly_expenses', 0)
+    balance = financial_summary.get('total_balance', 0)
+
+    income_volatility = 0.3
+
+    category_expenses = defaultdict(float)
+    for tx in transactions:
+        if tx['amount'] < 0:
+            category_expenses[tx['category']] += abs(tx['amount'])
+
+    if category_expenses and total_expenses > 0:
+        max_category_expense = max(category_expenses.values())
+        expense_concentration = (max_category_expense / total_expenses) * 100
+    else:
+        expense_concentration = 0
+
+    over_budget_count = sum(1 for b in budgets if b.get('status') == 'over')
+    budget_compliance = max(0, 100 - (over_budget_count * 20))
+
+    emergency_fund_target = total_expenses * 3
+    emergency_fund_score = min(100, (balance / emergency_fund_target * 100) if emergency_fund_target > 0 else 0)
+
+    overall_score = (
+            (100 - income_volatility * 100) * 0.25 +
+            (100 - min(100, expense_concentration)) * 0.25 +
+            budget_compliance * 0.25 +
+            emergency_fund_score * 0.25
+    )
+
+    # Determine risk level
+    if overall_score >= 80:
+        level = "Muy Bajo"
+    elif overall_score >= 60:
+        level = "Bajo"
+    elif overall_score >= 40:
+        level = "Medio"
+    elif overall_score >= 20:
+        level = "Alto"
+    else:
+        level = "Muy Alto"
+
+    recommendations = []
+    if emergency_fund_score < 50:
+        recommendations.append("Construye un fondo de emergencia de al menos 3 meses de gastos")
+    if expense_concentration > 40:
+        recommendations.append("Diversifica tus gastos para reducir dependencia de una categoría")
+    if budget_compliance < 70:
+        recommendations.append("Mejora el cumplimiento de tus presupuestos establecidos")
+
+    return {
+        "overallScore": round(overall_score, 1),
+        "level": level,
+        "factors": {
+            "incomeVolatility": round(income_volatility * 100, 1),
+            "expenseConcentration": round(expense_concentration, 1),
+            "budgetCompliance": round(budget_compliance, 1),
+            "emergencyFund": round(emergency_fund_score, 1)
+        },
+        "recommendations": recommendations
+    }
 
 def generate_fallback_insights(financial_summary: Dict, budget_status: List, category_expenses: Dict) -> Dict:
     """
