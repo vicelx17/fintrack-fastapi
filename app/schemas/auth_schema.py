@@ -18,7 +18,7 @@ class LoginBody(BaseModel):
         description="User's password for authentication.",
         examples=["SecurePassword123!"],
         min_length=8,
-        max_length=128
+        max_length=72
     )
 
 
@@ -70,7 +70,7 @@ class RegisterBody(BaseModel):
         description="Password for the new account. Should be strong and secure.",
         examples=["SecurePassword123!"],
         min_length=8,
-        max_length=128
+        max_length=72 #Max lenght for bycrypt.
     )
     role: Optional[str] = Field(
         default="user",

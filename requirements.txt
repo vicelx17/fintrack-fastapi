@@ -6,7 +6,6 @@ alembic
 asyncpg
 python-jose
 bcrypt
-passlib[bcrypt]
 python-multipart
 pydantic[email]
 reportlab
