@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.security import hash_password
+from app.models.category import Category
 from app.models.user import User
 from app.schemas.user import UserUpdate
 
@@ -20,8 +21,6 @@ async def get_user_by_id(db: AsyncSession, user_id: int):
     return user
 
 async def register_user(db: AsyncSession,first_name:str, last_name:str, username: str, email: str, password: str, role: str) -> User:
-    print(f"📝 Intentando registrar usuario: {username}")
-    print(f"📝 Password recibida: '{password}' (longitud: {len(password)})")
     result = await db.execute(select(User).filter(User.username == username))
     existing_user = result.scalars().first()
     if existing_user:
@@ -29,9 +28,7 @@ async def register_user(db: AsyncSession,first_name:str, last_name:str, username
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User already exists.",
         )
-    print(f"🔐 Hasheando password...")
     hashed_pwd = hash_password(password)
-    print(f"✅ Password hasheada correctamente")
     new_user = User(
         first_name=first_name,
         last_name=last_name,
@@ -43,7 +40,6 @@ async def register_user(db: AsyncSession,first_name:str, last_name:str, username
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    print(f"✅ Usuario {username} registrado exitosamente")
     return new_user
 
 async def update_user(db: AsyncSession, user_id: int, user_update: UserUpdate):

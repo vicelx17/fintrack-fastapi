@@ -16,7 +16,6 @@ def hash_password(password: str) -> str:
     except Exception as e:
         if "password too long" in str(e):
             raise HTTPException(status_code=401, detail="Password too long")
-        print(f"❌ Error al hashear: {e}")
         raise
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
