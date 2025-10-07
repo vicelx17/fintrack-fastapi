@@ -16,7 +16,7 @@ class Transaction(Base):
     created_at = Column(Date, default=date.today, nullable=False)
     updated_at = Column(Date, default=date.today, onupdate=date.today, nullable=False)
     type = Column(String, nullable=False)
-    notes = Column(String, nullable=False)
+    notes = Column(String, nullable=True)
 
     #FK
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

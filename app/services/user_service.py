@@ -11,10 +11,11 @@ from app.schemas.user import UserUpdate
 DEFAULT_CATEGORIES = [
     "Alimentación",
     "Ocio",
+    "Trabajo",
     "Suscripciones",
     "Viajes",
     "Transporte",
-    "Servicios",
+    "Facturas",
     "Otros"
 ]
 
