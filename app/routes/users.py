@@ -49,7 +49,7 @@ async def delete_current_user_account(
     result = await delete_user(db, current_user.id)
     return {"message": "Account deleted successfully"}
 
-# Admin-only endpoints
+
 @router.get("/{user_id}",
             summary="Retrieve a specific user by ID (Admin only).",
             description="Allows administrators to retrieve any user's profile information by their ID.",

@@ -8,6 +8,15 @@ from app.models.category import Category
 from app.models.user import User
 from app.schemas.user import UserUpdate
 
+DEFAULT_CATEGORIES = [
+    "Alimentación",
+    "Ocio",
+    "Suscripciones",
+    "Viajes",
+    "Transporte",
+    "Servicios",
+    "Otros"
+]
 
 async def get_all_users(db: AsyncSession):
     result = await db.execute(select(User))
@@ -20,7 +29,9 @@ async def get_user_by_id(db: AsyncSession, user_id: int):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-async def register_user(db: AsyncSession,first_name:str, last_name:str, username: str, email: str, password: str, role: str) -> User:
+
+async def register_user(db: AsyncSession, first_name: str, last_name: str, username: str, email: str, password: str,
+                        role: str) -> User:
     result = await db.execute(select(User).filter(User.username == username))
     existing_user = result.scalars().first()
     if existing_user:
@@ -28,19 +39,50 @@ async def register_user(db: AsyncSession,first_name:str, last_name:str, username
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User already exists.",
         )
-    hashed_pwd = hash_password(password)
-    new_user = User(
-        first_name=first_name,
-        last_name=last_name,
-        username=username,
-        email=email,
-        hashed_password=hashed_pwd,
-        role=role
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    return new_user
+
+    try:
+        hashed_pwd = hash_password(password)
+        new_user = User(
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            email=email,
+            hashed_password=hashed_pwd,
+            role=role
+        )
+        db.add(new_user)
+
+        # Flush para obtener el ID del usuario sin hacer commit
+        await db.flush()
+
+        print(f"Usuario creado con ID: {new_user.id}")
+
+        # Crear categorías por defecto en la misma transacción
+        for category_name in DEFAULT_CATEGORIES:
+            new_category = Category(
+                user_id=new_user.id,
+                name=category_name
+            )
+            db.add(new_category)
+            print(f"Añadiendo categoría: {category_name} para usuario {new_user.id}")
+
+        # Commit único para usuario y categorías
+        await db.commit()
+        await db.refresh(new_user)
+
+        print(f"Usuario y categorías guardados exitosamente")
+
+        return new_user
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error al registrar usuario: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating user: {str(e)}"
+        )
 
 async def update_user(db: AsyncSession, user_id: int, user_update: UserUpdate):
     updated_user = await get_user_by_id(db, user_id)
