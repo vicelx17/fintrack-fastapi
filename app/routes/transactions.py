@@ -7,8 +7,15 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 from app.services.auth_service import get_current_user
-from app.services.transaction_service import get_transactions, create_transaction, update_transaction, \
-    delete_transaction, get_transaction_by_id
+from app.services.transaction_service import (
+    get_transactions,
+    create_transaction,
+    update_transaction,
+    delete_transaction,
+    get_transaction_by_id,
+    get_transaction_stats,
+    get_category_breakdown
+)
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -39,6 +46,33 @@ async def list_user_transactions(
         max_amount=maxAmount
     )
 
+
+@router.get("/stats",
+            response_model=Dict,
+            summary="Get transaction statistics",
+            description="Get statistics about user transactions",
+            )
+async def get_user_transaction_stats(
+        dateRange: Optional[str] = Query(None, description="Filter by date range"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await get_transaction_stats(db, current_user.id, dateRange)
+
+
+@router.get("/category-breakdown",
+            response_model=List[Dict],
+            summary="Get category breakdown",
+            description="Get breakdown of transactions by category",
+            )
+async def get_user_category_breakdown(
+        dateRange: Optional[str] = Query(None, description="Filter by date range"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await get_category_breakdown(db, current_user.id, dateRange)
+
+
 @router.get("/{id}",
             response_model=Dict,
             summary="Get transaction by id",
@@ -56,6 +90,7 @@ async def get_user_transaction(
             detail="Transaction not found"
         )
     return transaction
+
 
 @router.post("/",
              response_model=Dict,
@@ -88,6 +123,7 @@ async def update_user_transaction(
 
 
 @router.delete("/{id}",
+               response_model=Dict,
                summary="Delete an existing transaction",
                description="Allows the authenticated user to delete an existing transaction", )
 async def delete_user_transaction(

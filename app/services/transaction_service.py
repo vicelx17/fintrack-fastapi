@@ -9,7 +9,6 @@ from app.models.category import Category
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
-
 async def create_transaction(db: AsyncSession, user_id: int, transaction: TransactionCreate) -> Dict:
     new_transaction = Transaction(
         user_id=user_id,
@@ -130,9 +129,10 @@ async def get_transaction_by_id(db: AsyncSession, user_id: int, transaction_id: 
         "updatedAt": transaction.updated_at.isoformat() if transaction.updated_at else None
     }
 
+
 async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Optional[str] = None) -> Dict:
-    """Get transaction statistics."""
-    query = (select(Transaction).where(Transaction.user_id == user_id))
+    """Get transaction statistics"""
+    query = select(Transaction).where(Transaction.user_id == user_id)
 
     today = date.today()
     start_date = None
@@ -155,7 +155,6 @@ async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Opti
             start_date = today - timedelta(days=365)
             days_count = 365
     else:
-        # Por defecto: este mes
         start_date = today - timedelta(days=30)
         days_count = 30
 
@@ -166,25 +165,28 @@ async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Opti
     transactions = result.scalars().all()
 
     total_transactions = len(transactions)
-    total_income = sum(transaction.amount for transaction in transactions if transaction.type == "income")
-    total_expenses = sum(transaction.amount for transaction in transactions if transaction.type == "expense")
+    total_income = sum(abs(transaction.amount) for transaction in transactions if transaction.type == "income")
+    total_expenses = sum(abs(transaction.amount) for transaction in transactions if transaction.type == "expense")
 
-    #net balance
-    average_dialy = ((total_income-total_expenses) / days_count) if days_count > 0 else 0
+    # Balance neto = ingresos - gastos
+    net_balance = total_income - total_expenses
+
+    # Promedio diario del balance neto
+    average_daily = (net_balance / days_count) if days_count > 0 else 0
 
     return {
         "totalTransactions": total_transactions,
-        "totalIncome": round(total_income,2),
-        "totalExpenses": round(total_expenses,2),
-        "averageDialy": round(average_dialy,2),
+        "totalIncome": round(total_income, 2),
+        "totalExpenses": round(total_expenses, 2),
+        "averageDaily": round(average_daily, 2),
     }
 
-async def get_category_breakdown(db: AsyncSession, user_id:int, date_range:Optional[str] = None) -> List[Dict]:
-    """Get category breakdown."""
+async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Optional[str] = None) -> List[Dict]:
     query = (
         select(
             Category.name,
-            func.sum(Transaction.amount).label("total"),
+            Transaction.type,
+            func.sum(func.abs(Transaction.amount)).label("total"),
         )
         .join(Transaction, Category.id == Transaction.category_id)
         .where(Transaction.user_id == user_id)
@@ -208,17 +210,22 @@ async def get_category_breakdown(db: AsyncSession, user_id:int, date_range:Optio
         if start_date:
             query = query.where(Transaction.transaction_date >= start_date)
 
-    query = query.group_by(Category.name).order_by(func.sum(Transaction.amount).desc())
+    query = query.group_by(Category.name, Transaction.type).order_by(func.sum(func.abs(Transaction.amount)).desc())
 
     result = await db.execute(query)
     breakdown = result.all()
 
-    result = [
-        {"category": name, "amount": round(float(total),2)}
-        for name, total in breakdown
+    return [
+        {
+            "category": name,
+            "type": type,
+            "amount": round(float(total), 2)
+        }
+        for name, type, total in breakdown
     ]
 
-async def update_transaction(db: AsyncSession, user_id: int, transaction_id: int, transaction_update: TransactionUpdate) -> Optional[Dict]:
+async def update_transaction(db: AsyncSession, user_id: int, transaction_id: int,
+                             transaction_update: TransactionUpdate) -> Optional[Dict]:
     query = (
         update(Transaction)
         .where(Transaction.id == transaction_id, Transaction.user_id == user_id)
@@ -242,7 +249,7 @@ async def update_transaction(db: AsyncSession, user_id: int, transaction_id: int
         "type": updated_transaction.type,
         "amount": updated_transaction.amount,
         "description": updated_transaction.description,
-        "category": category.name if category else "Unknown",
+        "category": category.name,
         "transactionDate": updated_transaction.transaction_date.isoformat(),
         "notes": updated_transaction.notes,
         "createdAt": updated_transaction.created_at.isoformat() if updated_transaction.created_at else None,
