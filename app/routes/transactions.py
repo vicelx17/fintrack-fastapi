@@ -54,10 +54,12 @@ async def list_user_transactions(
             )
 async def get_user_transaction_stats(
         dateRange: Optional[str] = Query(None, description="Filter by date range"),
+        category: Optional[str] = Query(None, description="Filter by category name"),
+        type: Optional[str] = Query(None, description="Filter by transaction type (income/expense)"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    return await get_transaction_stats(db, current_user.id, dateRange)
+    return await get_transaction_stats(db, current_user.id, dateRange, category, type)
 
 
 @router.get("/category-breakdown",
@@ -67,10 +69,12 @@ async def get_user_transaction_stats(
             )
 async def get_user_category_breakdown(
         dateRange: Optional[str] = Query(None, description="Filter by date range"),
+        category: Optional[str] = Query(None, description="Filter by category name"),
+        type: Optional[str] = Query(None, description="Filter by transaction type (income/expense)"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    return await get_category_breakdown(db, current_user.id, dateRange)
+    return await get_category_breakdown(db, current_user.id, dateRange, category, type)
 
 
 @router.get("/{id}",

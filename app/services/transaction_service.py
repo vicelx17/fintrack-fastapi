@@ -130,7 +130,10 @@ async def get_transaction_by_id(db: AsyncSession, user_id: int, transaction_id: 
     }
 
 
-async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Optional[str] = None) -> Dict:
+async def get_transaction_stats(db: AsyncSession, user_id: int,
+                                date_range: Optional[str] = None,
+                                category: Optional[str] = None,
+                                transaction_type: Optional[str] = None) -> Dict:
     """Get transaction statistics"""
     query = select(Transaction).where(Transaction.user_id == user_id)
 
@@ -161,6 +164,20 @@ async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Opti
     if start_date:
         query = query.where(Transaction.transaction_date >= start_date)
 
+    if category:
+        category_result = await db.execute(
+            select(Category).where(
+                Category.user_id == user_id,
+                Category.name == category
+            )
+        )
+        category_obj = category_result.scalar_one_or_none()
+        if category_obj:
+            query = query.where(Transaction.category_id == category_obj.id)
+
+    if transaction_type and transaction_type in ["income", "expense"]:
+        query = query.where(Transaction.type == transaction_type)
+
     result = await db.execute(query)
     transactions = result.scalars().all()
 
@@ -181,7 +198,9 @@ async def get_transaction_stats(db: AsyncSession, user_id: int, date_range: Opti
         "averageDaily": round(average_daily, 2),
     }
 
-async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Optional[str] = None) -> List[Dict]:
+async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Optional[str] = None,
+                                category: Optional[str] = None,
+                                transaction_type: Optional[str] = None) -> List[Dict]:
     query = (
         select(
             Category.name,
@@ -209,6 +228,20 @@ async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Opt
 
         if start_date:
             query = query.where(Transaction.transaction_date >= start_date)
+
+    if category:
+        category_result = await db.execute(
+            select(Category).where(
+                Category.user_id == user_id,
+                Category.name == category
+            )
+        )
+        category_obj = category_result.scalar_one_or_none()
+        if category_obj:
+            query = query.where(Transaction.category_id == category_obj.id)
+
+    if transaction_type and transaction_type in ["income", "expense"]:
+        query = query.where(Transaction.type == transaction_type)
 
     query = query.group_by(Category.name, Transaction.type).order_by(func.sum(func.abs(Transaction.amount)).desc())
 
