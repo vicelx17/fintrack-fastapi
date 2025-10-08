@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -29,6 +29,18 @@ class BudgetBase(BaseModel):
         None,
         description="End date for the budget period. If not provided, budget has no end date restriction.",
         examples=["2025-12-31"]
+    )
+    period: Literal["weekly", "monthly", "quarterly", "yearly"] = Field(
+        "monthly",
+        description="Budget period type.",
+        examples=["monthly"]
+    )
+    alert_threshold: int = Field(
+        80,
+        description="Alert threshold percentage (0-100).",
+        examples=[80],
+        ge=0,
+        le=100
     )
     category_id: Optional[int] = Field(
         None,
@@ -77,6 +89,18 @@ class BudgetUpdate(BaseModel):
         description="Updated end date for the budget period.",
         examples=["2025-12-31"]
     )
+    period: Optional[Literal["weekly", "monthly", "quarterly", "yearly"]] = Field(
+        None,
+        description="Updated budget period type.",
+        examples=["monthly"]
+    )
+    alert_threshold: Optional[int] = Field(
+        None,
+        description="Updated alert threshold percentage (0-100).",
+        examples=[80],
+        ge=0,
+        le=100
+    )
     category_id: Optional[int] = Field(
         None,
         description="Updated category ID this budget applies to.",
@@ -96,16 +120,16 @@ class BudgetUpdate(BaseModel):
 class BudgetResponse(BudgetBase):
     """Schema for budget responses, including database fields."""
 
-    id: int = Field(
-        ...,
-        description="Unique identifier for the budget.",
-        examples=[1]
-    )
-    user_id: int = Field(
-        ...,
-        description="ID of the user who owns this budget.",
-        examples=[123]
-    )
+    id: int
+    userId: int
+    category: str
+    budgetAmount: float
+    spentAmount: float
+    period: str
+    startDate: str
+    endDate: str
+    alertThreshold: int
+    status: Literal["good", "warning", "over"]
 
     class Config:
         from_attributes = True

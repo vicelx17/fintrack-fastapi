@@ -15,6 +15,8 @@ class Budget(Base):
     amount = Column(Float, nullable=False)
     start_date = Column(Date, default=date.today(), nullable=False)
     end_date = Column(Date, default=date.today(), nullable=False)
+    period = Column(String, default="monthly", nullable=False)
+    alert_threshold = Column(Integer, default=80, nullable=False)
 
     # FK
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
