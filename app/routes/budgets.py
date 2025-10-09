@@ -1,7 +1,6 @@
-# app/api/v1/budget_routes.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from app.core.database import get_db
 from app.models.user import User
@@ -134,21 +133,14 @@ async def update_user_budget(
     return updated_budget
 
 
-@router.delete("/{budget_id}",
+@router.delete("/{id}",
+               response_model=Dict,
                summary="Delete a specific budget",
                description="Permanently delete the specified budget if it belongs to the authenticated user.",
-               status_code=status.HTTP_204_NO_CONTENT)
+               )
 async def delete_user_budget(
-        budget_id: int,
+        id: int,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
 ):
-    budget = await get_budget_by_id(db, current_user.id, budget_id)
-    if not budget:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Budget not found"
-        )
-
-    result = await delete_budget(db, current_user.id, budget_id)
-    return {"message": "Budget deleted successfully"}
+    return await delete_budget(db, current_user.id, id)

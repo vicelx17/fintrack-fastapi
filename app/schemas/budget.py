@@ -117,7 +117,7 @@ class BudgetUpdate(BaseModel):
         return self
 
 
-class BudgetResponse(BudgetBase):
+class BudgetResponse(BaseModel):
     """Schema for budget responses, including database fields."""
 
     id: int

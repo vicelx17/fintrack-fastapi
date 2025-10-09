@@ -136,9 +136,12 @@ async def update_budget(
     await db.refresh(updated_budget)
     return await budget_to_dict(db, updated_budget)
 
-async def delete_budget(db: AsyncSession, user_id: int, budget_id: int):
-    """Delete a budget."""
+async def delete_budget(db: AsyncSession, user_id: int, budget_id: int) -> Dict:
     query = delete(Budget).where(Budget.id == budget_id, Budget.user_id == user_id)
-    await db.execute(query)
+    result = await db.execute(query)
     await db.commit()
-    return {"message": "Budget deleted successfully"}
+
+    if result.rowcount == 0:
+        return {"success": False, "message": "Budget not found"}
+
+    return {"success": True, "message": "Budget deleted"}
