@@ -96,19 +96,19 @@ async def get_budget_overview(db: AsyncSession, user_id: int) -> Dict:
             )
         )
         spent_amount = spent_result.scalar() or 0.0
-        total_spent += spent_amount
+        total_spent += abs(spent_amount)
 
         if spent_amount > budget.amount:
             budgets_exceeded += 1
 
-    available = total_budget - total_spent
+    available = total_budget - abs(total_spent)
     percentage_used = (total_spent / total_budget * 100) if total_budget > 0 else 0
 
     return {
         "totalBudget": total_budget,
-        "totalSpent": total_spent,
+        "totalSpent": abs(total_spent),
         "available": available,
-        "percentageUsed": percentage_used,
+        "percentageUsed": abs(percentage_used),
         "budgetsExceeded": budgets_exceeded,
         "totalBudgets": total_budgets,
     }
@@ -270,7 +270,7 @@ async def get_budget_performance(db: AsyncSession, user_id: int) -> List[Dict]:
             "budgetId": budget.id,
             "categoryName": category.name if category else "Unknown",
             "budgetAmount": budget.amount,
-            "spentAmount": spent_amount,
+            "spentAmount": abs(spent_amount),
             "percentageUsed": percentage_used,
             "daysRemaining": max(0, days_remaining),
             "daysTotal": days_total,

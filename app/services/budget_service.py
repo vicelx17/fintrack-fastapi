@@ -33,10 +33,10 @@ async def calculate_spent_amount(
 
 def calculate_status(spent_amount: float, budget_amount: float, alert_threshold: int) -> str:
     """Calculate budget status based on spent amount and threshold."""
-    if spent_amount > budget_amount:
+    if abs(spent_amount) > budget_amount:
         return "over"
 
-    percentage = (spent_amount / budget_amount) * 100
+    percentage = (abs(spent_amount) / budget_amount) * 100
     if percentage >= alert_threshold:
         return "warning"
 
@@ -65,7 +65,7 @@ async def budget_to_dict(db: AsyncSession, budget: Budget) -> Dict:
         "userId": budget.user_id,
         "category": category.name if category else "Unknown",
         "budgetAmount": budget.amount,
-        "spentAmount": spent_amount,
+        "spentAmount": abs(spent_amount),
         "period": budget.period,
         "startDate": budget.start_date.isoformat(),
         "endDate": budget.end_date.isoformat(),
