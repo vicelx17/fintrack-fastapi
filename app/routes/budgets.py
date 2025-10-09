@@ -1,12 +1,14 @@
 # app/api/v1/budget_routes.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse
 from app.services.auth_service import get_current_user
+from app.services.budget_metrics_service import get_category_spending_breakdown, get_budget_performance, \
+    get_budget_analytics, get_budget_overview, get_budget_alerts
 from app.services.budget_service import (
     create_budget,
     get_budgets,
@@ -17,6 +19,7 @@ from app.services.budget_service import (
 
 router = APIRouter(prefix="/budgets", tags=["Budgets"])
 
+# ============= GET ROUTES Endpoints =============
 
 @router.get("/",
             summary="Retrieve all budgets for the authenticated user.",
@@ -27,6 +30,61 @@ async def list_budgets(
         current_user: User = Depends(get_current_user),
 ):
     return await get_budgets(db, current_user.id)
+
+@router.get("/alerts",
+            summary="Get budget alerts",
+            description="Returns all active budget alerts for the authenticated user, including exceeded budgets and approaching limits.")
+async def list_budget_alerts(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    alerts = await get_budget_alerts(db, current_user.id)
+    return {"alerts": alerts}
+
+
+@router.get("/overview",
+            summary="Get budget overview",
+            description="Returns overall budget metrics including total budget, spent amount, and exceeded budgets.")
+async def get_overview(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    overview = await get_budget_overview(db, current_user.id)
+    return {"overview": overview}
+
+
+@router.get("/analytics",
+            summary="Get detailed budget analytics",
+            description="Returns comprehensive budget analytics including overview, category breakdown, alerts, and trends.")
+async def get_analytics(
+        period: Optional[str] = Query("monthly", description="Period for analytics: weekly, monthly, quarterly, yearly"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    analytics = await get_budget_analytics(db, current_user.id, period)
+    return {"analytics": analytics}
+
+
+@router.get("/category-breakdown",
+            summary="Get category spending breakdown",
+            description="Returns spending breakdown by category for the current period.")
+async def get_breakdown(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    breakdown = await get_category_spending_breakdown(db, current_user.id)
+    return {"breakdown": breakdown}
+
+
+@router.get("/performance/metrics",
+            summary="Get budget performance metrics",
+            description="Returns performance metrics for each budget including spending pace and days remaining.")
+async def get_performance(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    performance = await get_budget_performance(db, current_user.id)
+    return {"performance": performance}
 
 @router.get("/{budget_id}",
             summary="Retrieve a specific budget by its ID.",
@@ -44,7 +102,6 @@ async def list_budget_by_id(
             detail="Budget not found"
         )
     return budget
-
 
 @router.post("/",
              summary= "Create a new budget for the authenticated user.",
