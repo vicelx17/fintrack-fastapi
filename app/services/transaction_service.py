@@ -9,6 +9,7 @@ from app.models.category import Category
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
+
 async def create_transaction(db: AsyncSession, user_id: int, transaction: TransactionCreate) -> Dict:
     new_transaction = Transaction(
         user_id=user_id,
@@ -38,6 +39,7 @@ async def create_transaction(db: AsyncSession, user_id: int, transaction: Transa
         "createdAt": new_transaction.created_at.isoformat(),
         "updatedAt": new_transaction.updated_at.isoformat()
     }
+
 
 async def get_transactions(db: AsyncSession,
                            user_id: int,
@@ -103,6 +105,7 @@ async def get_transactions(db: AsyncSession,
         for transaction, category_name in transactions
     ]
 
+
 async def get_transaction_by_id(db: AsyncSession, user_id: int, transaction_id: int) -> Optional[Dict]:
     """Get a specific transaction by id"""
     result = await db.execute(
@@ -157,10 +160,29 @@ async def get_transaction_stats(db: AsyncSession, user_id: int,
         elif date_range == "year":
             start_date = today - timedelta(days=365)
             days_count = 365
+        elif date_range == "all":
+            start_date = None
+            first_transaction = await db.execute(
+                select(func.min(Transaction.transaction_date))
+                .where(Transaction.user_id == user_id)
+            )
+            first_date = first_transaction.scalar()
+            if first_date:
+                days_count = (today - first_date).days + 1
+            else:
+                days_count = 1
     else:
-        start_date = today - timedelta(days=30)
-        days_count = 30
-
+        first_transaction = await db.execute(
+            select(func.min(Transaction.transaction_date))
+            .where(Transaction.user_id == user_id)
+        )
+        first_date = first_transaction.scalar()
+        if first_date:
+            days_count = (today - first_date).days + 1
+            start_date = None
+        else:
+            days_count = 30
+            start_date = None
     if start_date:
         query = query.where(Transaction.transaction_date >= start_date)
 
@@ -198,9 +220,10 @@ async def get_transaction_stats(db: AsyncSession, user_id: int,
         "averageDaily": round(average_daily, 2),
     }
 
+
 async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Optional[str] = None,
-                                category: Optional[str] = None,
-                                transaction_type: Optional[str] = None) -> List[Dict]:
+                                 category: Optional[str] = None,
+                                 transaction_type: Optional[str] = None) -> List[Dict]:
     query = (
         select(
             Category.name,
@@ -225,6 +248,8 @@ async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Opt
             start_date = today - timedelta(days=90)
         elif date_range == "year":
             start_date = today - timedelta(days=365)
+        elif date_range == "all":
+            start_date = None
 
         if start_date:
             query = query.where(Transaction.transaction_date >= start_date)
@@ -257,6 +282,7 @@ async def get_category_breakdown(db: AsyncSession, user_id: int, date_range: Opt
         for name, type, total in breakdown
     ]
 
+
 async def update_transaction(db: AsyncSession, user_id: int, transaction_id: int,
                              transaction_update: TransactionUpdate) -> Optional[Dict]:
     query = (
@@ -288,6 +314,7 @@ async def update_transaction(db: AsyncSession, user_id: int, transaction_id: int
         "createdAt": updated_transaction.created_at.isoformat() if updated_transaction.created_at else None,
         "updatedAt": updated_transaction.updated_at.isoformat() if updated_transaction.updated_at else None,
     }
+
 
 async def delete_transaction(db: AsyncSession, user_id: int, transaction_id: int) -> Dict:
     query = delete(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == user_id)

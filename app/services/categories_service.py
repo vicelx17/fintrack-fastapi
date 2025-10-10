@@ -1,4 +1,4 @@
-from sqlalchemy import update, delete
+from sqlalchemy import update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -26,28 +26,34 @@ async def get_categories(db: AsyncSession, user_id: int):
             Category,
             func.count(Transaction.id).label('transaction_count')
         )
-        .outerjoin(Transaction, Category.id == Transaction.category_id)
+        .outerjoin(Transaction, and_(
+            Category.id == Transaction.category_id,
+            Transaction.user_id == user_id
+        ))
         .where(Category.user_id == user_id)
         .group_by(Category.id)
     )
 
     categories_with_count = []
-    for category, count in result:
-        category_dict = {
+    for row in result:
+        category = row[0]
+        count = row[1]
+        categories_with_count.append({
             "id": category.id,
             "name": category.name,
             "user_id": category.user_id,
             "transaction_count": count or 0
-        }
-        categories_with_count.append(category_dict)
+        })
 
     return categories_with_count
+
 
 async def get_category_by_id(db: AsyncSession, user_id: int, category_id: int):
     result = await db.execute(
         select(Category).where(Category.id == category_id, Category.user_id == user_id)
     )
     return result.scalars().one_or_none()
+
 
 async def update_category(db: AsyncSession, user_id: int, category_id: int, category_update: CategoryUpdate):
     query = (
@@ -59,6 +65,7 @@ async def update_category(db: AsyncSession, user_id: int, category_id: int, cate
     result = await db.execute(query)
     await db.commit()
     return result.scalars().one_or_none()
+
 
 async def delete_category(db: AsyncSession, user_id: int, category_id: int):
     query = delete(Category).where(Category.id == category_id, Category.user_id == user_id)
