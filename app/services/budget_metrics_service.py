@@ -96,9 +96,9 @@ async def get_budget_overview(db: AsyncSession, user_id: int) -> Dict:
             )
         )
         spent_amount = spent_result.scalar() or 0.0
-        total_spent += abs(spent_amount)
+        total_spent += spent_amount
 
-        if spent_amount > budget.amount:
+        if abs(spent_amount) > budget.amount:
             budgets_exceeded += 1
 
     available = total_budget - abs(total_spent)
