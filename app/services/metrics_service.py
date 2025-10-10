@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,7 +97,7 @@ async def calculate_financial_summary(db: AsyncSession, user_id: int) -> Dict:
                     return "0%"
                 return "+100.0%" if current > 0 else "-100.0%"
 
-            change = ((current - previous) / previous) * 100.0
+            change = ((current - previous) / abs(previous)) * 100.0
 
             change = round(change, 1)
             return f"{'+' if change > 0 else ''}{change:.1f}%"
@@ -123,7 +123,7 @@ async def calculate_financial_summary(db: AsyncSession, user_id: int) -> Dict:
 
 async def get_monthly_chart_data(db: AsyncSession, user_id: int, months: int = 12) -> List[Dict]:
     """
-    Obtain data for the monthly chart for de last 6 months
+    Obtain data for the monthly chart for de last 12 months
     """
     end_date = date.today()
     start_date = end_date - timedelta(days=months * 30)
@@ -200,13 +200,28 @@ async def get_monthly_chart_data(db: AsyncSession, user_id: int, months: int = 1
     return data
 
 
-async def get_category_chart_data(db: AsyncSession, user_id: int) -> List[Dict]:
+async def get_category_chart_data(
+        db: AsyncSession,
+        user_id: int,
+        month: Optional[int] = None,
+        year: Optional[int] = None
+) -> List[Dict]:
     """
-    Obtain data per category for charts
+    Obtain data per category for charts (both income and expenses)
     """
-    current_month_start = date.today().replace(day=1)
+    today = date.today()
 
-    category_data = await db.execute(
+    target_year = year if year else today.year
+    target_month = month if month else today.month
+
+    month_start = date(target_year, target_month, 1)
+
+    if target_month == 12:
+        month_end = date(target_year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(target_year, target_month + 1, 1) - timedelta(days=1)
+
+    expenses_data = await db.execute(
         select(
             Category.name.label('category'),
             func.sum(func.abs(Transaction.amount)).label('amount')
@@ -216,22 +231,44 @@ async def get_category_chart_data(db: AsyncSession, user_id: int) -> List[Dict]:
             and_(
                 Transaction.user_id == user_id,
                 Transaction.amount < 0,
-                Transaction.transaction_date >= current_month_start,
+                Transaction.transaction_date >= month_start,
+                Transaction.transaction_date <= month_end,
             )
         )
         .group_by(Category.name)
-        .order_by(func.sum(func.abs(Transaction.amount)).desc())
     )
 
+    incomes_data = await db.execute(
+        select(
+            Category.name.label('category'),
+            func.sum(Transaction.amount).label('amount')
+        )
+        .join(Transaction, Category.id == Transaction.category_id)
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.amount > 0,
+                Transaction.transaction_date >= month_start,
+                Transaction.transaction_date <= month_end,
+            )
+        )
+        .group_by(Category.name)
+    )
+
+    expenses_dict = {row.category: float(row.amount or 0) for row in expenses_data}
+    incomes_dict = {row.category: float(row.amount or 0) for row in incomes_data}
+
+    all_categories = set(expenses_dict.keys()) | set(incomes_dict.keys())
+
     data = []
-    for row in category_data:
+    for category in sorted(all_categories):
         data.append({
-            "category": row.category,
-            "amount": round(float(row.amount or 0), 2)
+            "category": category,
+            "expenses": round(expenses_dict.get(category, 0.0), 2),
+            "incomes": round(incomes_dict.get(category, 0.0), 2)
         })
 
     return data
-
 
 async def get_recent_transactions(db: AsyncSession, user_id: int, limit: int = 10) -> List[Dict]:
     """

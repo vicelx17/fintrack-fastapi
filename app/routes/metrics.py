@@ -1,7 +1,7 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -68,9 +68,11 @@ async def get_monthly_data(
 
 @router.get("/category-data",
             summary="Get monthly expenses data",
-            description="Returns current month expenses grouped by category for bar charts and category analysis.",
+            description="Returns expenses grouped by category for bar charts and category analysis.",
             response_model=Dict)
 async def get_category_data(
+        month: Optional[int] = Query(None, description="Month (1-12). If not provided, uses current month"),
+        year: Optional[int] = Query(None, description="Year. If not provided, uses current year"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
@@ -78,7 +80,7 @@ async def get_category_data(
     Obtain expenses data per category for bar graphic chart.
     """
     try:
-        category_data = await get_category_chart_data(db, current_user.id)
+        category_data = await get_category_chart_data(db, current_user.id, month, year)
         return {
             "success": True,
             "data": category_data,
