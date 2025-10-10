@@ -19,7 +19,7 @@ async def calculate_financial_summary(db: AsyncSession, user_id: int) -> Dict:
     current_month_start = today.replace(day=1)
 
     if today.month == 1:
-        current_month_start = date(today.year - 1, 12, 1)
+        previous_month_start = date(today.year - 1, 12, 1)
         previous_month_end = date(today.year - 1, 12, 31)
     else:
         previous_month_start = date(today.year, today.month - 1, 1)
@@ -86,27 +86,32 @@ async def calculate_financial_summary(db: AsyncSession, user_id: int) -> Dict:
         )
         previous_expenses = previous_expenses_result.scalar() or 0.0
 
-        savings = max(total_balance, 0.0)
+        previous_balance = total_balance - (monthly_income - monthly_expenses)
+
+        current_savings = monthly_income - monthly_expenses
+        previous_savings = previous_income - previous_expenses
 
         def calculate_percentage_change(current: float, previous: float) -> str:
             if previous == 0:
-                return "+100.0%" if current >= 0 else "0.0%"
+                if current == 0:
+                    return "0%"
+                return "+100.0%" if current > 0 else "-100.0%"
 
             change = ((current - previous) / previous) * 100.0
-            sign = "+" if current >= 0 else "-"
-            return f"{sign}{change:.1f}%"
 
-        balance_change = calculate_percentage_change(total_balance, total_balance - (monthly_income + monthly_expenses))
+            change = round(change, 1)
+            return f"{'+' if change > 0 else ''}{change:.1f}%"
+
+        balance_change = calculate_percentage_change(total_balance, previous_balance)
         income_change = calculate_percentage_change(monthly_income, previous_income)
         expenses_change = calculate_percentage_change(monthly_expenses, previous_expenses)
-        savings_change = calculate_percentage_change(savings,
-                                                     max(total_balance - (monthly_income + monthly_expenses), 0))
+        savings_change = calculate_percentage_change(current_savings, previous_savings)
 
         return {
             "total_balance": round(total_balance, 2),
             "monthly_income": round(monthly_income, 2),
             "monthly_expenses": round(monthly_expenses, 2),
-            "saving": round(savings, 2),
+            "saving": round(current_savings, 2),
             "changes": {
                 "balance": balance_change,
                 "income": income_change,
