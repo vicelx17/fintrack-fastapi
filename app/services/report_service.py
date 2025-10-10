@@ -297,3 +297,232 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
     doc.build(elements)
     buffer.seek(0)
     return buffer
+
+
+from datetime import date, timedelta
+from typing import Dict, List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.budget_metrics_service import get_category_spending_breakdown
+from app.services.metrics_service import get_category_chart_data
+
+
+async def get_financial_summary_by_period(
+        db: AsyncSession,
+        user_id: int,
+        period: str
+) -> Dict:
+    """
+    Get financial summary for a specific period.
+    """
+    end_date = date.today()
+
+    if period == "week":
+        start_date = end_date - timedelta(days=7)
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+    elif period == "quarter":
+        start_date = end_date - timedelta(days=90)
+    elif period == "year":
+        start_date = end_date - timedelta(days=365)
+    else:
+        start_date = end_date - timedelta(days=30)
+
+    report = await generate_report(db, user_id, start_date, end_date)
+
+    # Calculate additional metrics
+    savings_rate = (
+            (report.total_income - report.total_expenses) / report.total_income * 100
+    ) if report.total_income > 0 else 0
+
+    days_count = (end_date - start_date).days + 1
+    avg_daily_spending = report.total_expenses / days_count if days_count > 0 else 0
+
+    return {
+        "totalIncome": round(report.total_income, 2),
+        "totalExpenses": round(report.total_expenses, 2),
+        "netBalance": round(report.net_balance, 2),
+        "savingsRate": round(savings_rate, 1),
+        "averageDailySpending": round(avg_daily_spending, 2),
+        "budgetCompliance": 0.0,  # TODO: Implement if needed
+        "period": period
+    }
+
+
+async def get_expense_analysis_by_period(
+        db: AsyncSession,
+        user_id: int,
+        period: str
+) -> List[Dict]:
+    """
+    Get expense analysis by category for a specific period.
+    """
+    end_date = date.today()
+
+    if period == "week":
+        start_date = end_date - timedelta(days=7)
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+    elif period == "quarter":
+        start_date = end_date - timedelta(days=90)
+    elif period == "year":
+        start_date = end_date - timedelta(days=365)
+    else:
+        start_date = end_date - timedelta(days=30)
+
+    breakdown = await get_category_spending_breakdown(db, user_id, start_date, end_date)
+
+    # Transform data to match frontend expectations
+    analysis = []
+    total_spent = sum(item['totalSpent'] for item in breakdown)
+
+    for item in breakdown:
+        analysis.append({
+            "category": item['categoryName'],
+            "amount": abs(item['totalSpent']),
+            "percentage": round((abs(item['totalSpent']) / total_spent * 100), 1) if total_spent > 0 else 0,
+            "trend": "up",  # TODO: Implement trend calculation based on historical data
+            "change": 0.0,  # TODO: Implement change calculation
+            "budgetAmount": item.get('budgetAmount'),
+            "previousAmount": None  # TODO: Implement previous period comparison
+        })
+
+    return sorted(analysis, key=lambda x: x['amount'], reverse=True)
+
+
+async def get_income_analysis_by_period(
+        db: AsyncSession,
+        user_id: int,
+        period: str
+) -> List[Dict]:
+    """
+    Get income analysis by category for a specific period.
+    """
+    end_date = date.today()
+
+    if period == "week":
+        start_date = end_date - timedelta(days=7)
+        month = None
+        year = None
+    elif period == "month":
+        start_date = end_date - timedelta(days=30)
+        month = end_date.month
+        year = end_date.year
+    elif period == "quarter":
+        start_date = end_date - timedelta(days=90)
+        month = None
+        year = end_date.year
+    elif period == "year":
+        start_date = end_date - timedelta(days=365)
+        month = None
+        year = end_date.year
+    else:
+        start_date = end_date - timedelta(days=30)
+        month = end_date.month
+        year = end_date.year
+
+    # Get category data
+    category_data = await get_category_chart_data(db, user_id, month, year)
+
+    # Filter only income categories
+    total_income = sum(item['incomes'] for item in category_data if item['incomes'] > 0)
+
+    analysis = []
+    for item in category_data:
+        if item['incomes'] > 0:
+            analysis.append({
+                "category": item['category'],
+                "amount": round(item['incomes'], 2),
+                "percentage": round((item['incomes'] / total_income * 100), 1) if total_income > 0 else 0,
+                "trend": "up",  # TODO: Implement trend calculation
+                "change": 0.0,  # TODO: Implement change calculation
+                "previousAmount": None  # TODO: Implement previous period comparison
+            })
+
+    return sorted(analysis, key=lambda x: x['amount'], reverse=True)
+
+
+async def get_trend_analysis_by_period(
+        db: AsyncSession,
+        user_id: int,
+        period: str,
+        granularity: str = "monthly"
+) -> List[Dict]:
+    """
+    Get trend analysis for income, expenses and balance.
+    """
+    from app.services.metrics_service import get_monthly_chart_data
+
+    # Determine number of months based on period
+    if period == "week":
+        months = 1
+    elif period == "month":
+        months = 3
+    elif period == "quarter":
+        months = 6
+    elif period == "year":
+        months = 12
+    else:
+        months = 6
+
+    monthly_data = await get_monthly_chart_data(db, user_id, months)
+
+    # Transform data to match frontend expectations
+    trends = []
+    for item in monthly_data:
+        trends.append({
+            "period": item['month'],
+            "income": round(item['incomes'], 2),
+            "expenses": round(item['expenses'], 2),
+            "balance": round(item['balance'], 2),
+            "savings": round(item['incomes'] - item['expenses'], 2)
+        })
+
+    return trends
+
+
+async def export_report_by_filters(
+        db: AsyncSession,
+        user_id: int,
+        filters: Dict,
+        format_type: str
+) -> tuple[any, str]:
+    """
+    Export report based on filters and format.
+    """
+    date_range = filters.get('dateRange', 'month')
+
+    # Calculate dates
+    end_date = date.today()
+
+    if date_range == "week":
+        start_date = end_date - timedelta(days=7)
+    elif date_range == "month":
+        start_date = end_date - timedelta(days=30)
+    elif date_range == "quarter":
+        start_date = end_date - timedelta(days=90)
+    elif date_range == "year":
+        start_date = end_date - timedelta(days=365)
+    elif date_range == "custom":
+        start_date_str = filters.get('startDate')
+        end_date_str = filters.get('endDate')
+        if start_date_str:
+            start_date = date.fromisoformat(start_date_str)
+        else:
+            start_date = end_date - timedelta(days=30)
+        if end_date_str:
+            end_date = date.fromisoformat(end_date_str)
+    else:
+        start_date = end_date - timedelta(days=30)
+
+    report_data = await generate_report(db, user_id, start_date, end_date)
+
+    if format_type == 'pdf':
+        pdf_file = await generate_pdf_report(report_data)
+        filename = f"financial_report_{date_range}.pdf"
+        return pdf_file, filename
+    elif format_type == 'json':
+        json_data = report_data.model_dump(mode="json")
+        filename = f"financial_report_{date_range}.json"
+        return json_data, filename
+    else:
+        raise ValueError(f"Unsupported format: {format_type}")
