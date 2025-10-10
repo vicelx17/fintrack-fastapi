@@ -16,9 +16,32 @@ async def create_category(db: AsyncSession, user_id: int, category: CategoryCrea
     await db.refresh(new_category)
     return new_category
 
+
 async def get_categories(db: AsyncSession, user_id: int):
-    result = await db.execute(select(Category).where(Category.user_id == user_id))
-    return result.scalars().all()
+    from sqlalchemy import func
+    from app.models.transaction import Transaction
+
+    result = await db.execute(
+        select(
+            Category,
+            func.count(Transaction.id).label('transaction_count')
+        )
+        .outerjoin(Transaction, Category.id == Transaction.category_id)
+        .where(Category.user_id == user_id)
+        .group_by(Category.id)
+    )
+
+    categories_with_count = []
+    for category, count in result:
+        category_dict = {
+            "id": category.id,
+            "name": category.name,
+            "user_id": category.user_id,
+            "transaction_count": count or 0
+        }
+        categories_with_count.append(category_dict)
+
+    return categories_with_count
 
 async def get_category_by_id(db: AsyncSession, user_id: int, category_id: int):
     result = await db.execute(
