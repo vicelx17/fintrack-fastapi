@@ -14,5 +14,5 @@ class CategoryUpdate(CategoryBase):
 class CategoryResponse(CategoryBase):
     id: int = Field(..., example=1,description="ID of category")
     user_id: int = Field(...,description="User ID")
-
+    transaction_count: int = Field(...,description="Associated category transactions count")
     model_config = {"from_attributes":True}
