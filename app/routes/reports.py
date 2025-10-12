@@ -1,6 +1,10 @@
+from typing import Dict
+
+from app.services.budget_metrics_service import get_category_spending_breakdown
+from app.services.metrics_service import get_monthly_chart_data
 from datetime import timedelta, date
 
-from fastapi import APIRouter, Query, Depends, HTTPException
+from fastapi import APIRouter, Query, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse, JSONResponse
 
@@ -8,7 +12,9 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.report_schema import ReportResponse
 from app.services.auth_service import get_current_user
-from app.services.report_service import generate_report, generate_pdf_report
+from app.services.report_service import generate_report, generate_pdf_report, export_report_by_filters, \
+    get_trend_analysis_by_period, get_income_analysis_by_period, get_expense_analysis_by_period, \
+    get_financial_summary_by_period
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -31,6 +37,114 @@ async def get_custom_report(
         end_date=end_date,
     )
     return report
+
+
+@router.get("/summary",
+            summary="Get financial summary for period",
+            description="Returns financial summary metrics for a specific period")
+async def get_financial_summary_report(
+        period: str = Query("month", description="Period: week, month, quarter, year"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Get financial summary for a specific period."""
+    try:
+        summary = await get_financial_summary_by_period(db, current_user.id, period)
+        return {"summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting financial summary: {str(e)}")
+
+
+@router.get("/expenses",
+            summary="Get expense analysis by category",
+            description="Returns detailed expense analysis for a period")
+async def get_expense_analysis(
+        period: str = Query("month", description="Period: week, month, quarter, year"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Get expense analysis by category for a period."""
+    try:
+        analysis = await get_expense_analysis_by_period(db, current_user.id, period)
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting expense analysis: {str(e)}")
+
+
+@router.get("/income",
+            summary="Get income analysis by category",
+            description="Returns detailed income analysis for a period")
+async def get_income_analysis(
+        period: str = Query("month", description="Period: week, month, quarter, year"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Get income analysis by category for a period."""
+    try:
+        analysis = await get_income_analysis_by_period(db, current_user.id, period)
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting income analysis: {str(e)}")
+
+
+@router.get("/trends",
+            summary="Get trend analysis",
+            description="Returns trend data for income, expenses and balance")
+async def get_trend_analysis(
+        period: str = Query("month", description="Period: week, month, quarter, year"),
+        granularity: str = Query("monthly", description="Granularity: daily, weekly, monthly"),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Get trend analysis for specified period and granularity."""
+    try:
+        trends = await get_trend_analysis_by_period(db, current_user.id, period, granularity)
+        return {"trends": trends}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting trend analysis: {str(e)}")
+
+
+
+@router.post("/export",
+             summary="Export report in different formats",
+             description="Export report as PDF, CSV or JSON based on filters")
+async def export_report_endpoint(
+        filters: Dict = Body(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Export report based on filters and format."""
+    try:
+        format_type = filters.get('format', 'pdf')
+
+        if format_type not in ['pdf', 'json', 'csv']:
+            raise HTTPException(status_code=400, detail="Format must be pdf, json or csv")
+
+        report_data, filename = await export_report_by_filters(
+            db,
+            current_user.id,
+            filters,
+            format_type
+        )
+
+        if format_type == 'pdf':
+            return StreamingResponse(
+                report_data,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        elif format_type == 'json':
+            return JSONResponse(
+                content=report_data,
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Format not yet implemented")
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting report: {str(e)}")
 
 
 @router.get("/weekly", summary="Generate Weekly Report",
