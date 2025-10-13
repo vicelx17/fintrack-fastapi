@@ -1,7 +1,4 @@
-from datetime import date
 from io import BytesIO
-from typing import Optional
-
 from matplotlib import pyplot as plt
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -11,9 +8,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
 from app.models.transaction import Transaction
 from app.schemas.report_schema import ReportResponse, ReportTransaction, ReportCategory
+from datetime import date, timedelta
+from typing import Dict, List, Optional
+from app.services.budget_metrics_service import get_category_spending_breakdown
+from app.services.metrics_service import get_category_chart_data
 
 
 async def generate_report(
@@ -62,7 +62,7 @@ async def generate_report(
             id=transaction.id,
             amount=transaction.amount,
             description=transaction.description,
-            date=transaction.date,
+            report_date=transaction.transaction_date,
             category=transaction.category.name if transaction.category else "Sin categoría",
         )
         for transaction in transactions_data
@@ -298,14 +298,6 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
     buffer.seek(0)
     return buffer
 
-
-from datetime import date, timedelta
-from typing import Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.budget_metrics_service import get_category_spending_breakdown
-from app.services.metrics_service import get_category_chart_data
-
-
 async def get_financial_summary_by_period(
         db: AsyncSession,
         user_id: int,
@@ -314,6 +306,9 @@ async def get_financial_summary_by_period(
     """
     Get financial summary for a specific period.
     """
+    from sqlalchemy import select, func, and_
+    from app.models.transaction import Transaction
+
     end_date = date.today()
 
     if period == "week":
@@ -327,23 +322,47 @@ async def get_financial_summary_by_period(
     else:
         start_date = end_date - timedelta(days=30)
 
-    report = await generate_report(db, user_id, start_date, end_date)
+    # Calculate total income
+    income_result = await db.execute(
+        select(func.sum(Transaction.amount))
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.type == "income",
+                Transaction.transaction_date >= start_date,
+                Transaction.transaction_date <= end_date
+            )
+        )
+    )
+    total_income = float(income_result.scalar() or 0)
 
-    # Calculate additional metrics
-    savings_rate = (
-            (report.total_income - report.total_expenses) / report.total_income * 100
-    ) if report.total_income > 0 else 0
+    # Calculate total expenses
+    expenses_result = await db.execute(
+        select(func.sum(func.abs(Transaction.amount)))
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.type == "expense",
+                Transaction.transaction_date >= start_date,
+                Transaction.transaction_date <= end_date
+            )
+        )
+    )
+    total_expenses = float(expenses_result.scalar() or 0)
 
+    # Calculate metrics
+    net_balance = total_income - total_expenses
+    savings_rate = (net_balance / total_income * 100) if total_income > 0 else 0
     days_count = (end_date - start_date).days + 1
-    avg_daily_spending = report.total_expenses / days_count if days_count > 0 else 0
+    avg_daily_spending = total_expenses / days_count if days_count > 0 else 0
 
     return {
-        "totalIncome": round(report.total_income, 2),
-        "totalExpenses": round(report.total_expenses, 2),
-        "netBalance": round(report.net_balance, 2),
+        "totalIncome": round(total_income, 2),
+        "totalExpenses": round(total_expenses, 2),
+        "netBalance": round(net_balance, 2),
         "savingsRate": round(savings_rate, 1),
         "averageDailySpending": round(avg_daily_spending, 2),
-        "budgetCompliance": 0.0,  # TODO: Implement if needed
+        "budgetCompliance": 0.0,
         "period": period
     }
 
