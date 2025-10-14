@@ -89,19 +89,19 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
 
     # ---- Header ----
     title_style = styles["Title"]
-    title = Paragraph("FinTrack - Financial Report", title_style)
+    title = Paragraph("FinTrack - Reporte Financiero", title_style)
     elements.append(title)
 
-    current_date = date.today().strftime("%Y-%m-%d")
-    elements.append(Paragraph(f"Generated on: {current_date}", styles["Normal"]))
+    current_date = date.today().strftime("%d/%m/%Y")
+    elements.append(Paragraph(f"Generado el: {current_date}", styles["Normal"]))
     elements.append(Spacer(1, 0.2 * inch))
 
     # ---- Summary Section ----
     summary_data = [
-        ["Metric", "Value"],
-        ["Total Income", f"${report_data.total_income:.2f}"],
-        ["Total Expenses", f"${report_data.total_expenses:.2f}"],
-        ["Net Balance", f"${report_data.net_balance:.2f}"],
+        ["Métrica", "Valor"],
+        ["Ingresos Totales", f"€{report_data.total_income:.2f}"],
+        ["Gastos Totales", f"€{report_data.total_expenses:.2f}"],
+        ["Balance Neto", f"€{report_data.net_balance:.2f}"],
     ]
 
     summary_table = Table(summary_data, colWidths=[3 * inch, 3 * inch])
@@ -122,105 +122,141 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
                 ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
 
                 # PADDING AJUSTADO
-                ("TOPPADDING", (0, 0), (-1, 0), 8),  # Header
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),  # Header
-                ("TOPPADDING", (0, 1), (-1, -1), 6),  # Datos
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 6),  # Datos
+                ("TOPPADDING", (0, 0), (-1, 0), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+                ("TOPPADDING", (0, 1), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
             ]
         )
     )
 
-    elements.append(Paragraph("Summary", styles["Heading2"]))
+    elements.append(Paragraph("Resumen Financiero", styles["Heading2"]))
     elements.append(summary_table)
     elements.append(Spacer(1, 0.3 * inch))
 
-    # ---- Generar gráfico si hay datos ----
-    if report_data.top_categories:
+    # ---- Separar ingresos y gastos por categoría ----
+    income_categories = []
+    expense_categories = []
+
+    for cat in report_data.top_categories:
+        if cat.net_category_balance > 0:
+            income_categories.append(cat)
+        else:
+            expense_categories.append(cat)
+
+    # ---- Gráfico de Ingresos ----
+    if income_categories:
         try:
-            # Convertir los objetos ReportCategory a datos para el gráfico
-            chart_categories = []
-            for cat in report_data.top_categories:
-                chart_categories.append({
-                    "category": cat.category,
-                    "total": float(cat.net_category_balance)
-                })
+            buffer_income = BytesIO()
 
-            # Generar gráfico con matplotlib
-            buffer_chart = BytesIO()
+            categories = [cat.category for cat in income_categories]
+            amounts = [float(cat.net_category_balance) for cat in income_categories]
 
-            categories = [cat["category"] for cat in chart_categories]
-            totals = [cat["total"] for cat in chart_categories]
+            plt.figure(figsize=(8, 4))
+            bars = plt.bar(categories, amounts, color="#2d5a3d", edgecolor="#1a472a", linewidth=1.5)
 
-            plt.figure(figsize=(8, 5))
-            # COLORES VERDES PARA EL GRÁFICO
-            bars = plt.bar(categories, totals, color="#2d5a3d", edgecolor="#1a472a", linewidth=1.5)
+            for bar, amount in zip(bars, amounts):
+                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(amounts) * 0.01,
+                         f'€{amount:.2f}', ha='center', va='bottom', fontsize=10, color="#1a472a", fontweight='bold')
 
-            # Agregar valores encima de las barras
-            for bar, total in zip(bars, totals):
-                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(totals) * 0.01,
-                         f'${total:.2f}', ha='center', va='bottom', fontsize=10, color="#1a472a", fontweight='bold')
-
-            plt.title("Top Categories - Net Balance", fontsize=14, fontweight="bold", color="#1a472a")
-            plt.xlabel("Categories", fontsize=12, color="#2d5a3d")
-            plt.ylabel("Net Balance ($)", fontsize=12, color="#2d5a3d")
+            plt.title("Ingresos por Categoría", fontsize=14, fontweight="bold", color="#1a472a")
+            plt.xlabel("Categorías", fontsize=12, color="#2d5a3d")
+            plt.ylabel("Cantidad (€)", fontsize=12, color="#2d5a3d")
             plt.xticks(rotation=45, ha="right", color="#2d5a3d")
             plt.yticks(color="#2d5a3d")
             plt.tight_layout()
 
-            # Guardar en buffer
-            plt.savefig(buffer_chart, format="png", dpi=100, bbox_inches='tight')
-            plt.close()  # Cerrar para liberar memoria
+            plt.savefig(buffer_income, format="png", dpi=100, bbox_inches='tight')
+            plt.close()
 
-            # Resetear posición del buffer
-            buffer_chart.seek(0)
-
-            # Crear imagen para el PDF
-            chart_image = Image(buffer_chart, width=5 * inch, height=3 * inch)
-            elements.append(Paragraph("Top Categories (Chart)", styles["Heading2"]))
-            elements.append(Spacer(1, 0.1 * inch))  # Consistente con el resto
-            elements.append(chart_image)
+            buffer_income.seek(0)
+            income_image = Image(buffer_income, width=5 * inch, height=2.5 * inch)
+            elements.append(Paragraph("Ingresos por Categoría", styles["Heading2"]))
+            elements.append(Spacer(1, 0.1 * inch))
+            elements.append(income_image)
             elements.append(Spacer(1, 0.3 * inch))
 
         except Exception as e:
-            # Si hay error con el gráfico, solo mostrar un mensaje
-            print(f"Error generando gráfico: {e}")
-            elements.append(Paragraph("Top Categories (Chart unavailable)", styles["Heading2"]))
+            print(f"Error generando gráfico de ingresos: {e}")
+            elements.append(Paragraph("Ingresos por Categoría (Gráfico no disponible)", styles["Heading2"]))
             elements.append(Spacer(1, 0.2 * inch))
 
-    # ---- Top Categories Table ----
-    elements.append(Paragraph("Top Categories (Table)", styles["Heading2"]))
+    # ---- Gráfico de Gastos ----
+    if expense_categories:
+        try:
+            buffer_expense = BytesIO()
+
+            categories = [cat.category for cat in expense_categories]
+            amounts = [abs(float(cat.net_category_balance)) for cat in expense_categories]
+
+            plt.figure(figsize=(8, 4))
+            bars = plt.bar(categories, amounts, color="#dc2626", edgecolor="#991b1b", linewidth=1.5)
+
+            for bar, amount in zip(bars, amounts):
+                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(amounts) * 0.01,
+                         f'€{amount:.2f}', ha='center', va='bottom', fontsize=10, color="#991b1b", fontweight='bold')
+
+            plt.title("Gastos por Categoría", fontsize=14, fontweight="bold", color="#991b1b")
+            plt.xlabel("Categorías", fontsize=12, color="#dc2626")
+            plt.ylabel("Cantidad (€)", fontsize=12, color="#dc2626")
+            plt.xticks(rotation=45, ha="right", color="#dc2626")
+            plt.yticks(color="#dc2626")
+            plt.tight_layout()
+
+            plt.savefig(buffer_expense, format="png", dpi=100, bbox_inches='tight')
+            plt.close()
+
+            buffer_expense.seek(0)
+            expense_image = Image(buffer_expense, width=5 * inch, height=2.5 * inch)
+            elements.append(Paragraph("Gastos por Categoría", styles["Heading2"]))
+            elements.append(Spacer(1, 0.1 * inch))
+            elements.append(expense_image)
+            elements.append(Spacer(1, 0.3 * inch))
+
+        except Exception as e:
+            print(f"Error generando gráfico de gastos: {e}")
+            elements.append(Paragraph("Gastos por Categoría (Gráfico no disponible)", styles["Heading2"]))
+            elements.append(Spacer(1, 0.2 * inch))
+
+    # ---- Tabla de Top Categorías ----
+    elements.append(Paragraph("Resumen por Categorías", styles["Heading2"]))
 
     if report_data.top_categories:
-        top_categories_data = [["Category", "Net Balance"]]
+        top_categories_data = [["Categoría", "Balance Neto", "Tipo"]]
         for cat in report_data.top_categories:
-            top_categories_data.append([cat.category, f"${cat.net_category_balance:.2f}"])
+            tipo = "Ingreso" if cat.net_category_balance > 0 else "Gasto"
+            top_categories_data.append([
+                cat.category,
+                f"€{cat.net_category_balance:.2f}",
+                tipo
+            ])
     else:
-        top_categories_data = [["Category", "Net Balance"], ["No data available", "$0.00"]]
+        top_categories_data = [["Categoría", "Balance Neto", "Tipo"], ["No hay datos disponibles", "€0.00", "N/A"]]
 
-    top_categories_table = Table(top_categories_data, colWidths=[3 * inch, 3 * inch])
+    top_categories_table = Table(top_categories_data, colWidths=[2.5 * inch, 2 * inch, 1.5 * inch])
     top_categories_table.setStyle(
         TableStyle(
             [
-                # HEADER - Verde oscuro profesional
+                # HEADER
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
 
-                # DATOS - Verde muy claro
+                # DATOS
                 ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f0f7f1")),
 
-                # BORDES - Verde suave
+                # BORDES
                 ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
 
-                # PADDING COMPACTO
-                ("TOPPADDING", (0, 0), (-1, 0), 8),  # Header
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),  # Header
-                ("TOPPADDING", (0, 1), (-1, -1), 5),  # Datos más compactos
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 5),  # Datos más compactos
+                # PADDING
+                ("TOPPADDING", (0, 0), (-1, 0), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+                ("TOPPADDING", (0, 1), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
             ]
@@ -228,33 +264,39 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
     )
 
     elements.append(top_categories_table)
-    elements.append(Spacer(1, 0.15 * inch))
+    elements.append(Spacer(1, 0.3 * inch))
 
-    # ---- Transactions Section ----
-    elements.append(Paragraph("Recent Transactions", styles["Heading2"]))
+    # ---- Tabla de Transacciones Recientes ----
+    elements.append(Paragraph("Transacciones Recientes", styles["Heading2"]))
     elements.append(Spacer(1, 0.05 * inch))
 
     if report_data.transactions:
-        transactions_data = [["Date", "Description", "Amount", "Category"]]
+        transactions_data = [["Fecha", "Descripción", "Cantidad", "Categoría"]]
         for tx in report_data.transactions:
+            formatted_date = tx.report_date.strftime("%d/%m/%Y")
             transactions_data.append(
-                [str(tx.report_date), tx.description,
-                 f"${tx.amount:.2f}", tx.category]
+                [
+                    formatted_date,
+                    tx.description,
+                    f"€{tx.amount:.2f}",
+                    tx.category
+                ]
             )
     else:
-        transactions_data = [["Date", "Description", "Amount", "Category"],
-                             ["No transactions", "available", "$0.00", "N/A"]]
+        transactions_data = [
+            ["Fecha", "Descripción", "Cantidad", "Categoría"],
+            ["Sin transacciones", "disponibles", "€0.00", "N/A"]
+        ]
 
     transactions_table = Table(
         transactions_data,
-        colWidths=[1.5 * inch, 2.5 * inch, 1 * inch, 1.5 * inch]
+        colWidths=[1.2 * inch, 2.8 * inch, 1 * inch, 1.5 * inch]
     )
-
 
     transactions_table.setStyle(
         TableStyle(
             [
-                # HEADER - Verde oscuro profesional
+                # HEADER
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -263,19 +305,19 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
 
-                # DATOS - Verde muy claro alternando con blanco
+                # DATOS - Alternar colores
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f8fdf9"), colors.white]),
 
-                # BORDES - Verde suave
+                # BORDES
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#2d5a3d")),
 
-                # PADDING MUY COMPACTO - ESTO ELIMINA EL ESPACIO GRANDE
-                ("TOPPADDING", (0, 0), (-1, 0), 6),  # Header normal
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),  # Header normal
-                ("TOPPADDING", (0, 1), (-1, -1), 2),  # Datos MUY compactos
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 2),  # Datos MUY compactos
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),  # Menos padding horizontal también
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),  # Menos padding horizontal también
+                # PADDING COMPACTO
+                ("TOPPADDING", (0, 0), (-1, 0), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                ("TOPPADDING", (0, 1), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 3),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
@@ -286,7 +328,7 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
     elements.append(Spacer(1, 0.5 * inch))
     elements.append(
         Paragraph(
-            "© 2025 FinTrack - Personal Finance Management Tool",
+            "© 2025 FinTrack - Herramienta de Gestión Financiera Personal",
             styles["Normal"]
         )
     )
