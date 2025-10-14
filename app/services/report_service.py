@@ -80,12 +80,22 @@ async def generate_report(
     )
 
 
-async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
+async def generate_pdf_report(
+        report_data: ReportResponse,
+        filters: Optional[Dict] = None,
+        financial_summary: Optional[Dict] = None,
+        expense_analysis: Optional[List[Dict]] = None,
+        income_analysis: Optional[List[Dict]] = None,
+        trend_data: Optional[List[Dict]] = None
+) -> BytesIO:
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5 * inch, bottomMargin=0.5 * inch)
 
     styles = getSampleStyleSheet()
     elements = []
+
+    report_type = filters.get('reportType', 'comprehensive') if filters else 'comprehensive'
+    transaction_limit = filters.get('transactionLimit') if filters else None
 
     # ---- Header ----
     title_style = styles["Title"]
@@ -93,35 +103,71 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
     elements.append(title)
 
     current_date = date.today().strftime("%d/%m/%Y")
+
+    # Mostrar período del reporte
+    period_text = ""
+    if filters:
+        date_range = filters.get('dateRange', 'month')
+        if date_range == "custom":
+            start = filters.get('startDate', '')
+            end = filters.get('endDate', '')
+            period_text = f"Período: {start} al {end}"
+        else:
+            period_map = {
+                'week': 'Última semana',
+                'month': 'Último mes',
+                'quarter': 'Último trimestre',
+                'year': 'Último año'
+            }
+            period_text = f"Período: {period_map.get(date_range, 'Personalizado')}"
+
     elements.append(Paragraph(f"Generado el: {current_date}", styles["Normal"]))
+    if period_text:
+        elements.append(Paragraph(period_text, styles["Normal"]))
+
+    # Mostrar tipo de reporte
+    report_type_map = {
+        'comprehensive': 'Completo',
+        'expenses': 'Solo Gastos',
+        'income': 'Solo Ingresos',
+        'budgets': 'Presupuestos',
+        'trends': 'Tendencias'
+    }
+    elements.append(Paragraph(f"Tipo de reporte: {report_type_map.get(report_type, 'Completo')}", styles["Normal"]))
     elements.append(Spacer(1, 0.2 * inch))
 
     # ---- Summary Section ----
-    summary_data = [
-        ["Métrica", "Valor"],
-        ["Ingresos Totales", f"€{report_data.total_income:.2f}"],
-        ["Gastos Totales", f"€{report_data.total_expenses:.2f}"],
-        ["Balance Neto", f"€{report_data.net_balance:.2f}"],
-    ]
+    summary_data = [["Métrica", "Valor"]]
+
+    if report_type in ['comprehensive', 'income']:
+        summary_data.append(["Ingresos Totales", f"€{report_data.total_income:.2f}"])
+
+    if report_type in ['comprehensive', 'expenses']:
+        summary_data.append(["Gastos Totales", f"€{report_data.total_expenses:.2f}"])
+
+    if report_type == 'comprehensive':
+        summary_data.append(["Balance Neto", f"€{report_data.net_balance:.2f}"])
+
+    # Agregar métricas adicionales si están disponibles
+    if financial_summary:
+        if report_type in ['comprehensive', 'income'] and financial_summary.get('savingsRate'):
+            summary_data.append(["Tasa de Ahorro", f"{financial_summary['savingsRate']:.1f}%"])
+        if report_type in ['comprehensive', 'expenses'] and financial_summary.get('averageDailySpending'):
+            summary_data.append(["Gasto Diario Promedio", f"€{financial_summary['averageDailySpending']:.2f}"])
+        if financial_summary.get('budgetCompliance') and report_type in ['comprehensive', 'budgets']:
+            summary_data.append(["Cumplimiento Presupuesto", f"{financial_summary['budgetCompliance']:.1f}%"])
 
     summary_table = Table(summary_data, colWidths=[3 * inch, 3 * inch])
     summary_table.setStyle(
         TableStyle(
             [
-                # HEADER - Verde oscuro profesional
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-
-                # DATOS - Verde muy claro
                 ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f0f7f1")),
-
-                # BORDES - Verde suave
                 ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
-
-                # PADDING AJUSTADO
                 ("TOPPADDING", (0, 0), (-1, 0), 8),
                 ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
                 ("TOPPADDING", (0, 1), (-1, -1), 6),
@@ -147,32 +193,34 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
             expense_categories.append(cat)
 
     # ---- Gráfico de Ingresos ----
-    if income_categories:
+    if income_categories and report_type in ['comprehensive', 'income']:
         try:
             buffer_income = BytesIO()
 
             categories = [cat.category for cat in income_categories]
             amounts = [float(cat.net_category_balance) for cat in income_categories]
 
-            plt.figure(figsize=(8, 4))
+            plt.figure(figsize=(8, 4.5))
             bars = plt.bar(categories, amounts, color="#2d5a3d", edgecolor="#1a472a", linewidth=1.5)
 
+            max_amount = max(amounts)
             for bar, amount in zip(bars, amounts):
-                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(amounts) * 0.01,
+                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max_amount * 0.02,
                          f'€{amount:.2f}', ha='center', va='bottom', fontsize=10, color="#1a472a", fontweight='bold')
 
-            plt.title("Ingresos por Categoría", fontsize=14, fontweight="bold", color="#1a472a")
+            plt.title("Ingresos por Categoría", fontsize=14, fontweight="bold", color="#1a472a", pad=20)
             plt.xlabel("Categorías", fontsize=12, color="#2d5a3d")
             plt.ylabel("Cantidad (€)", fontsize=12, color="#2d5a3d")
             plt.xticks(rotation=45, ha="right", color="#2d5a3d")
             plt.yticks(color="#2d5a3d")
+            plt.ylim(0, max_amount * 1.15)  # Agregar espacio arriba para las etiquetas
             plt.tight_layout()
 
             plt.savefig(buffer_income, format="png", dpi=100, bbox_inches='tight')
             plt.close()
 
             buffer_income.seek(0)
-            income_image = Image(buffer_income, width=5 * inch, height=2.5 * inch)
+            income_image = Image(buffer_income, width=5 * inch, height=2.8 * inch)
             elements.append(Paragraph("Ingresos por Categoría", styles["Heading2"]))
             elements.append(Spacer(1, 0.1 * inch))
             elements.append(income_image)
@@ -180,36 +228,36 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
 
         except Exception as e:
             print(f"Error generando gráfico de ingresos: {e}")
-            elements.append(Paragraph("Ingresos por Categoría (Gráfico no disponible)", styles["Heading2"]))
-            elements.append(Spacer(1, 0.2 * inch))
 
     # ---- Gráfico de Gastos ----
-    if expense_categories:
+    if expense_categories and report_type in ['comprehensive', 'expenses']:
         try:
             buffer_expense = BytesIO()
 
             categories = [cat.category for cat in expense_categories]
             amounts = [abs(float(cat.net_category_balance)) for cat in expense_categories]
 
-            plt.figure(figsize=(8, 4))
+            plt.figure(figsize=(8, 4.5))
             bars = plt.bar(categories, amounts, color="#dc2626", edgecolor="#991b1b", linewidth=1.5)
 
+            max_amount = max(amounts)
             for bar, amount in zip(bars, amounts):
-                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(amounts) * 0.01,
+                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max_amount * 0.02,
                          f'€{amount:.2f}', ha='center', va='bottom', fontsize=10, color="#991b1b", fontweight='bold')
 
-            plt.title("Gastos por Categoría", fontsize=14, fontweight="bold", color="#991b1b")
+            plt.title("Gastos por Categoría", fontsize=14, fontweight="bold", color="#991b1b", pad=20)
             plt.xlabel("Categorías", fontsize=12, color="#dc2626")
             plt.ylabel("Cantidad (€)", fontsize=12, color="#dc2626")
             plt.xticks(rotation=45, ha="right", color="#dc2626")
             plt.yticks(color="#dc2626")
+            plt.ylim(0, max_amount * 1.15)  # Agregar espacio arriba para las etiquetas
             plt.tight_layout()
 
             plt.savefig(buffer_expense, format="png", dpi=100, bbox_inches='tight')
             plt.close()
 
             buffer_expense.seek(0)
-            expense_image = Image(buffer_expense, width=5 * inch, height=2.5 * inch)
+            expense_image = Image(buffer_expense, width=5 * inch, height=2.8 * inch)
             elements.append(Paragraph("Gastos por Categoría", styles["Heading2"]))
             elements.append(Spacer(1, 0.1 * inch))
             elements.append(expense_image)
@@ -217,71 +265,146 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
 
         except Exception as e:
             print(f"Error generando gráfico de gastos: {e}")
-            elements.append(Paragraph("Gastos por Categoría (Gráfico no disponible)", styles["Heading2"]))
-            elements.append(Spacer(1, 0.2 * inch))
+
+    # ---- Análisis de Presupuestos ----
+    if report_type in ['comprehensive', 'budgets'] and expense_analysis:
+        elements.append(Paragraph("Análisis de Presupuestos", styles["Heading2"]))
+
+        budget_data = [["Categoría", "Gastado", "Presupuesto", "% Usado"]]
+        for item in expense_analysis[:10]:
+            if item.get('budgetAmount'):
+                budget_amount = item['budgetAmount']
+                spent = item['amount']
+                percentage = (spent / budget_amount * 100) if budget_amount > 0 else 0
+                budget_data.append([
+                    item['category'],
+                    f"€{spent:.2f}",
+                    f"€{budget_amount:.2f}",
+                    f"{percentage:.1f}%"
+                ])
+
+        if len(budget_data) > 1:
+            budget_table = Table(budget_data, colWidths=[2 * inch, 1.5 * inch, 1.5 * inch, 1 * inch])
+            budget_table.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f0f7f1")),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ])
+            )
+            elements.append(budget_table)
+            elements.append(Spacer(1, 0.3 * inch))
+
+    # ---- Análisis de Tendencias ----
+    if report_type in ['comprehensive', 'trends'] and trend_data and len(trend_data) > 0:
+        try:
+            buffer_trend = BytesIO()
+
+            periods = [item['period'] for item in trend_data]
+            incomes = [item['income'] for item in trend_data]
+            expenses = [item['expenses'] for item in trend_data]
+
+            plt.figure(figsize=(8, 4))
+            plt.plot(periods, incomes, marker='o', color="#2d5a3d", linewidth=2, label='Ingresos')
+            plt.plot(periods, expenses, marker='o', color="#dc2626", linewidth=2, label='Gastos')
+
+            plt.title("Tendencias Financieras", fontsize=14, fontweight="bold", color="#1a472a")
+            plt.xlabel("Período", fontsize=12)
+            plt.ylabel("Cantidad (€)", fontsize=12)
+            plt.xticks(rotation=45, ha="right")
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+
+            plt.savefig(buffer_trend, format="png", dpi=100, bbox_inches='tight')
+            plt.close()
+
+            buffer_trend.seek(0)
+            trend_image = Image(buffer_trend, width=5 * inch, height=2.5 * inch)
+            elements.append(Paragraph("Tendencias Financieras", styles["Heading2"]))
+            elements.append(Spacer(1, 0.1 * inch))
+            elements.append(trend_image)
+            elements.append(Spacer(1, 0.3 * inch))
+
+        except Exception as e:
+            print(f"Error generando gráfico de tendencias: {e}")
 
     # ---- Tabla de Top Categorías ----
-    elements.append(Paragraph("Resumen por Categorías", styles["Heading2"]))
+    if report_data.top_categories and report_type == 'comprehensive':
+        elements.append(Paragraph("Resumen por Categorías", styles["Heading2"]))
 
-    if report_data.top_categories:
         top_categories_data = [["Categoría", "Balance Neto", "Tipo"]]
-        for cat in report_data.top_categories:
+        for cat in report_data.top_categories[:10]:
             tipo = "Ingreso" if cat.net_category_balance > 0 else "Gasto"
             top_categories_data.append([
                 cat.category,
                 f"€{cat.net_category_balance:.2f}",
                 tipo
             ])
-    else:
-        top_categories_data = [["Categoría", "Balance Neto", "Tipo"], ["No hay datos disponibles", "€0.00", "N/A"]]
 
-    top_categories_table = Table(top_categories_data, colWidths=[2.5 * inch, 2 * inch, 1.5 * inch])
-    top_categories_table.setStyle(
-        TableStyle(
-            [
-                # HEADER
+        top_categories_table = Table(top_categories_data, colWidths=[2.5 * inch, 2 * inch, 1.5 * inch])
+        top_categories_table.setStyle(
+            TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-
-                # DATOS
                 ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f0f7f1")),
-
-                # BORDES
                 ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
-
-                # PADDING
-                ("TOPPADDING", (0, 0), (-1, 0), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-                ("TOPPADDING", (0, 1), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ]
+            ])
         )
-    )
 
-    elements.append(top_categories_table)
-    elements.append(Spacer(1, 0.3 * inch))
+        elements.append(top_categories_table)
+        elements.append(Spacer(1, 0.3 * inch))
 
-    # ---- Tabla de Transacciones Recientes ----
-    elements.append(Paragraph("Transacciones Recientes", styles["Heading2"]))
+    # ---- Tabla de Transacciones ----
+    elements.append(Paragraph("Transacciones", styles["Heading2"]))
+
+    if transaction_limit:
+        elements.append(Paragraph(f"Mostrando {transaction_limit} transacciones", styles["Normal"]))
+
     elements.append(Spacer(1, 0.05 * inch))
 
     if report_data.transactions:
+        # Filtrar transacciones según el tipo de reporte
+        filtered_transactions = report_data.transactions
+
+        if report_type == 'expenses':
+            filtered_transactions = [tx for tx in filtered_transactions if tx.amount < 0]
+        elif report_type == 'income':
+            filtered_transactions = [tx for tx in filtered_transactions if tx.amount > 0]
+
+        # Aplicar límite de transacciones
+        limit = transaction_limit if transaction_limit else len(filtered_transactions)
+        transactions_to_show = filtered_transactions[:limit]
+
         transactions_data = [["Fecha", "Descripción", "Cantidad", "Categoría"]]
-        for tx in report_data.transactions:
+        for tx in transactions_to_show:
             formatted_date = tx.report_date.strftime("%d/%m/%Y")
-            transactions_data.append(
-                [
-                    formatted_date,
-                    tx.description,
-                    f"€{tx.amount:.2f}",
-                    tx.category
-                ]
-            )
+            desc = tx.description[:35] + "..." if len(tx.description) > 35 else tx.description
+            transactions_data.append([
+                formatted_date,
+                desc,
+                f"€{tx.amount:.2f}",
+                tx.category
+            ])
+
+        if len(filtered_transactions) > limit:
+            remaining = len(filtered_transactions) - limit
+            transactions_data.append(["...", f"y {remaining} transacciones más", "", ""])
     else:
         transactions_data = [
             ["Fecha", "Descripción", "Cantidad", "Categoría"],
@@ -290,36 +413,27 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
 
     transactions_table = Table(
         transactions_data,
-        colWidths=[1.2 * inch, 2.8 * inch, 1 * inch, 1.5 * inch]
+        colWidths=[1.2 * inch, 2.5 * inch, 1.1 * inch, 1.7 * inch]
     )
 
     transactions_table.setStyle(
-        TableStyle(
-            [
-                # HEADER
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-
-                # DATOS - Alternar colores
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f8fdf9"), colors.white]),
-
-                # BORDES
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#2d5a3d")),
-
-                # PADDING COMPACTO
-                ("TOPPADDING", (0, 0), (-1, 0), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                ("TOPPADDING", (0, 1), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 3),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ]
-        )
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f8fdf9"), colors.white]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#2d5a3d")),
+            ("TOPPADDING", (0, 0), (-1, 0), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+            ("TOPPADDING", (0, 1), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ])
     )
 
     elements.append(transactions_table)
@@ -333,7 +447,6 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
         )
     )
 
-    # Construir el PDF
     doc.build(elements)
     buffer.seek(0)
     return buffer
@@ -503,8 +616,7 @@ async def get_income_analysis_by_period(
 async def get_trend_analysis_by_period(
         db: AsyncSession,
         user_id: int,
-        period: str,
-        granularity: str = "monthly"
+        period: str
 ) -> List[Dict]:
     """
     Get trend analysis for income, expenses and balance.
@@ -577,12 +689,7 @@ async def export_report_by_filters(
     report_data = await generate_report(db, user_id, start_date, end_date)
 
     if format_type == 'pdf':
-        pdf_file = await generate_pdf_report(report_data)
-        filename = f"financial_report_{date_range}_{start_date}_{end_date}.pdf"
-        return pdf_file, filename
-    elif format_type == 'json':
-        # Para JSON, preparar un reporte completo con todos los datos
-
+        # Obtener datos adicionales para el PDF
         period_str = date_range if date_range != "custom" else "month"
 
         try:
@@ -601,7 +708,41 @@ async def export_report_by_filters(
             income_analysis = []
 
         try:
-            trend_data = await get_trend_analysis_by_period(db, user_id, period_str, "monthly")
+            trend_data = await get_trend_analysis_by_period(db, user_id, period_str)
+        except:
+            trend_data = []
+
+        pdf_file = await generate_pdf_report(
+            report_data,
+            filters=filters,
+            financial_summary=financial_summary,
+            expense_analysis=expense_analysis,
+            income_analysis=income_analysis,
+            trend_data=trend_data
+        )
+        filename = f"financial_report_{date_range}_{start_date}_{end_date}.pdf"
+        return pdf_file, filename
+    elif format_type == 'json':
+        # Para JSON, preparar un reporte completo con todos los datos
+        period_str = date_range if date_range != "custom" else "month"
+
+        try:
+            financial_summary = await get_financial_summary_by_period(db, user_id, period_str)
+        except:
+            financial_summary = None
+
+        try:
+            expense_analysis = await get_expense_analysis_by_period(db, user_id, period_str)
+        except:
+            expense_analysis = []
+
+        try:
+            income_analysis = await get_income_analysis_by_period(db, user_id, period_str)
+        except:
+            income_analysis = []
+
+        try:
+            trend_data = await get_trend_analysis_by_period(db, user_id, period_str)
         except:
             trend_data = []
 

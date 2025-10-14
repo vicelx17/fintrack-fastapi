@@ -98,7 +98,7 @@ async def get_trend_analysis(
 ):
     """Get trend analysis for specified period and granularity."""
     try:
-        trends = await get_trend_analysis_by_period(db, current_user.id, period, granularity)
+        trends = await get_trend_analysis_by_period(db, current_user.id, period)
         return {"trends": trends}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting trend analysis: {str(e)}")
