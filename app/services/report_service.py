@@ -303,6 +303,38 @@ async def generate_pdf_report(
             elements.append(budget_table)
             elements.append(Spacer(1, 0.3 * inch))
 
+    # ---- Análisis de Ingresos por Categoría ----
+    if report_type in ['comprehensive', 'income'] and income_analysis:
+        elements.append(Paragraph("Análisis de Ingresos por Categoría", styles["Heading2"]))
+
+        income_data = [["Categoría", "Cantidad", "% del Total"]]
+        for item in income_analysis[:10]:
+            income_data.append([
+                item['category'],
+                f"€{item['amount']:.2f}",
+                f"{item['percentage']:.1f}%"
+            ])
+
+        if len(income_data) > 1:
+            income_table = Table(income_data, colWidths=[2.5 * inch, 2 * inch, 1.5 * inch])
+            income_table.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a472a")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f0f7f1")),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.HexColor("#2d5a3d")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ])
+            )
+            elements.append(income_table)
+            elements.append(Spacer(1, 0.3 * inch))
+
     # ---- Análisis de Tendencias ----
     if report_type in ['comprehensive', 'trends'] and trend_data and len(trend_data) > 0:
         try:
@@ -616,7 +648,8 @@ async def get_income_analysis_by_period(
 async def get_trend_analysis_by_period(
         db: AsyncSession,
         user_id: int,
-        period: str
+        period: str,
+        granularity: str = "monthly"
 ) -> List[Dict]:
     """
     Get trend analysis for income, expenses and balance.
