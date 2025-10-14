@@ -1,17 +1,19 @@
+from datetime import date, timedelta
 from io import BytesIO
+from typing import Dict, List, Optional
+
 from matplotlib import pyplot as plt
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from app.models.transaction import Transaction
 from app.schemas.report_schema import ReportResponse, ReportTransaction, ReportCategory
-from datetime import date, timedelta
-from typing import Dict, List, Optional
 from app.services.budget_metrics_service import get_category_spending_breakdown
 from app.services.metrics_service import get_category_chart_data
 
@@ -25,9 +27,9 @@ async def generate_report(
     query = select(Transaction).options(selectinload(Transaction.category)).where(Transaction.user_id == user_id)
 
     if start_date:
-        query = query.where(Transaction.date >= start_date)
+        query = query.where(Transaction.transaction_date >= start_date)
     if end_date:
-        query = query.where(Transaction.date <= end_date)
+        query = query.where(Transaction.transaction_date <= end_date)
 
     result = await db.execute(query)
     transactions_data = result.scalars().all()
@@ -234,15 +236,11 @@ async def generate_pdf_report(report_data: ReportResponse) -> BytesIO:
 
     if report_data.transactions:
         transactions_data = [["Date", "Description", "Amount", "Category"]]
-        # Limitar a las primeras 20 transacciones para evitar PDFs muy largos
-        for tx in report_data.transactions[:20]:
+        for tx in report_data.transactions:
             transactions_data.append(
-                [str(tx.date), tx.description[:30] + "..." if len(tx.description) > 30 else tx.description,
+                [str(tx.report_date), tx.description,
                  f"${tx.amount:.2f}", tx.category]
             )
-
-        if len(report_data.transactions) > 20:
-            transactions_data.append(["...", f"and {len(report_data.transactions) - 20} more transactions", "", ""])
     else:
         transactions_data = [["Date", "Description", "Amount", "Category"],
                              ["No transactions", "available", "$0.00", "N/A"]]
@@ -533,15 +531,82 @@ async def export_report_by_filters(
     else:
         start_date = end_date - timedelta(days=30)
 
+    # Generate the base report
     report_data = await generate_report(db, user_id, start_date, end_date)
 
     if format_type == 'pdf':
         pdf_file = await generate_pdf_report(report_data)
-        filename = f"financial_report_{date_range}.pdf"
+        filename = f"financial_report_{date_range}_{start_date}_{end_date}.pdf"
         return pdf_file, filename
     elif format_type == 'json':
-        json_data = report_data.model_dump(mode="json")
-        filename = f"financial_report_{date_range}.json"
+        # Para JSON, preparar un reporte completo con todos los datos
+
+        period_str = date_range if date_range != "custom" else "month"
+
+        try:
+            financial_summary = await get_financial_summary_by_period(db, user_id, period_str)
+        except:
+            financial_summary = None
+
+        try:
+            expense_analysis = await get_expense_analysis_by_period(db, user_id, period_str)
+        except:
+            expense_analysis = []
+
+        try:
+            income_analysis = await get_income_analysis_by_period(db, user_id, period_str)
+        except:
+            income_analysis = []
+
+        try:
+            trend_data = await get_trend_analysis_by_period(db, user_id, period_str, "monthly")
+        except:
+            trend_data = []
+
+        # Construir el objeto JSON completo
+        json_data = {
+            "summary": {
+                "totalIncome": report_data.total_income,
+                "totalExpenses": report_data.total_expenses,
+                "netBalance": report_data.net_balance,
+                "savingsRate": financial_summary.get('savingsRate', 0) if financial_summary else 0,
+                "averageDailySpending": financial_summary.get('averageDailySpending', 0) if financial_summary else 0,
+                "budgetCompliance": financial_summary.get('budgetCompliance', 0) if financial_summary else 0,
+                "period": f"{start_date} to {end_date}"
+            },
+            "expenseAnalysis": expense_analysis,
+            "incomeAnalysis": income_analysis,
+            "trends": trend_data,
+            "categoryBreakdown": [
+                {
+                    "category": cat.category,
+                    "amount": abs(cat.net_category_balance),
+                    "percentage": 0,  # Se puede calcular si es necesario
+                    "trend": "up" if cat.net_category_balance > 0 else "down",
+                    "change": 0
+                }
+                for cat in report_data.top_categories
+            ],
+            "transactions": [
+                {
+                    "id": tx.id,
+                    "amount": tx.amount,
+                    "description": tx.description,
+                    "date": str(tx.report_date),
+                    "category": tx.category
+                }
+                for tx in report_data.transactions[:50]  # Limitar a 50 transacciones
+            ],
+            "generatedAt": date.today().isoformat(),
+            "filters": {
+                "dateRange": date_range,
+                "startDate": str(start_date),
+                "endDate": str(end_date),
+                "reportType": filters.get('reportType', 'comprehensive')
+            }
+        }
+
+        filename = f"financial_report_{date_range}_{start_date}_{end_date}.json"
         return json_data, filename
     else:
         raise ValueError(f"Unsupported format: {format_type}")

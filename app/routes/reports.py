@@ -120,6 +120,9 @@ async def export_report_endpoint(
         if format_type not in ['pdf', 'json', 'csv']:
             raise HTTPException(status_code=400, detail="Format must be pdf, json or csv")
 
+        print(f"Received filters: {filters}")
+        print(f"Format: {format_type}")
+
         report_data, filename = await export_report_by_filters(
             db,
             current_user.id,
@@ -134,6 +137,7 @@ async def export_report_endpoint(
                 headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
         elif format_type == 'json':
+            # Si es en JSON, devolver directamente datos
             return JSONResponse(
                 content=report_data,
                 headers={"Content-Disposition": f"attachment; filename={filename}"}
@@ -142,8 +146,12 @@ async def export_report_endpoint(
             raise HTTPException(status_code=400, detail="Format not yet implemented")
 
     except ValueError as e:
+        print(f"ValueError in export: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"Exception in export: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error exporting report: {str(e)}")
 
 
