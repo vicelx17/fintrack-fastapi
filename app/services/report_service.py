@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from io import BytesIO
 from typing import Dict, List, Optional
 
@@ -474,7 +474,7 @@ async def generate_pdf_report(
     elements.append(Spacer(1, 0.5 * inch))
     elements.append(
         Paragraph(
-            "© 2025 FinTrack - Herramienta de Gestión Financiera Personal",
+            f"© {datetime.now().year} FinTrack - Herramienta de Gestión Financiera Personal",
             styles["Normal"]
         )
     )
